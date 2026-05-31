@@ -1,0 +1,41 @@
+@startuml
+title Figure 5.1 – RaSTA Architecture Based on the Black Channel Principle
+
+skinparam backgroundColor white
+skinparam componentStyle rectangle
+
+rectangle "Safety-Related Railway System A" {
+
+rectangle "Railway Application A" as APP_A
+
+rectangle "RaSTA Sender Endpoint" {
+  rectangle "CRC Generation"
+  rectangle "Sequence Numbering"
+  rectangle "Connection Supervision"
+  rectangle "Endpoint Identification"
+}
+}
+
+rectangle "Non-Safe Communication Network\nBlack Channel\n(Ethernet/IP/UDP)" as NET
+
+rectangle "Safety-Related Railway System B" {
+
+rectangle "RaSTA Receiver Endpoint" {
+  rectangle "CRC Verification"
+  rectangle "Sequence Verification"
+  rectangle "Timeout Monitoring"
+  rectangle "Endpoint Validation"
+}
+
+rectangle "Railway Application B" as APP_B
+}
+
+APP_A --> NET : Protected\nRaSTA Messages
+NET --> APP_B : Verified\nApplication Data
+
+note bottom of NET
+Network is NOT trusted.
+Safety is ensured by RaSTA endpoints.
+end note
+
+@enduml

@@ -1,0 +1,45 @@
+@startuml
+title Figure 7.2 – Fault Tree Analysis (FTA)
+
+top to bottom direction
+
+rectangle "TOP EVENT\nHazardous Command Accepted" as TOP #F4CCCC
+
+rectangle "OR" as OR1 #FFF2CC
+
+rectangle "E1\nCorrupted Message Accepted" as E1
+rectangle "E2\nSequence Error Accepted" as E2
+rectangle "E3\nDelayed Message Accepted" as E3
+
+rectangle "AND" as AND1 #D9EAD3
+rectangle "AND" as AND2 #D9EAD3
+rectangle "AND" as AND3 #D9EAD3
+
+rectangle "Communication Corruption\n10^-5" as B1
+rectangle "CRC Failure\n2.33×10^-10" as B2
+
+rectangle "Sequence Error\n10^-5" as B3
+rectangle "Sequence Check Failure\n10^-6" as B4
+
+rectangle "Message Delay\n10^-5" as B5
+rectangle "Timeout Failure\n10^-6" as B6
+
+TOP --> OR1
+
+OR1 --> E1
+OR1 --> E2
+OR1 --> E3
+
+E1 --> AND1
+AND1 --> B1
+AND1 --> B2
+
+E2 --> AND2
+AND2 --> B3
+AND2 --> B4
+
+E3 --> AND3
+AND3 --> B5
+AND3 --> B6
+
+@enduml

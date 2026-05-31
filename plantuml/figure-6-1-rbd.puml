@@ -1,0 +1,23 @@
+@startuml
+title Figure 6.1 – Reliability Block Diagram (RBD)
+
+left to right direction
+
+rectangle "Application A\nR=0.9999" as A
+rectangle "RaSTA Sender\nR=0.9998" as B
+rectangle "Network\nR=0.9995" as C
+rectangle "RaSTA Receiver\nR=0.9998" as D
+rectangle "Application B\nR=0.9999" as E
+
+A --> B
+B --> C
+C --> D
+D --> E
+
+note bottom
+Series Reliability Model
+
+Rsystem = R1 × R2 × R3 × R4 × R5
+end note
+
+@enduml

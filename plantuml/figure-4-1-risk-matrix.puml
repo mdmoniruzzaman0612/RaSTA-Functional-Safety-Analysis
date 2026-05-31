@@ -1,0 +1,53 @@
+@startuml
+title Figure 4.1 – Risk Matrix for RaSTA Communication Hazards
+
+skinparam backgroundColor white
+skinparam shadowing false
+
+legend right
+Risk Levels:
+<#D9EAD3> Low
+<#FFF2CC> Medium
+<#FCE5CD> High
+<#F4CCCC> Very High
+endlegend
+
+rectangle "Risk Matrix" {
+
+rectangle "Likelihood \\ Severity" #E6E6E6
+rectangle "S1\nMinor" #E6E6E6
+rectangle "S2\nMajor" #E6E6E6
+rectangle "S3\nCritical" #E6E6E6
+rectangle "S4\nCatastrophic" #E6E6E6
+
+rectangle "Frequent" #E6E6E6
+rectangle "Medium" #FFF2CC
+rectangle "High" #FCE5CD
+rectangle "Very High" #F4CCCC
+rectangle "Very High" #F4CCCC
+
+rectangle "Probable" #E6E6E6
+rectangle "Medium" #FFF2CC
+rectangle "High" #FCE5CD
+rectangle "Very High" #F4CCCC
+rectangle "Very High" #F4CCCC
+
+rectangle "Occasional" #E6E6E6
+rectangle "Low" #D9EAD3
+rectangle "Medium" #FFF2CC
+rectangle "High" #FCE5CD
+rectangle "Very High" #F4CCCC
+
+rectangle "Remote" #E6E6E6
+rectangle "Low" #D9EAD3
+rectangle "Medium" #FFF2CC
+rectangle "Medium" #FFF2CC
+rectangle "High" #FCE5CD
+
+rectangle "Extremely Remote" #E6E6E6
+rectangle "Low" #D9EAD3
+rectangle "Low" #D9EAD3
+rectangle "Medium" #FFF2CC
+rectangle "Medium" #FFF2CC
+}
+@enduml

@@ -1,0 +1,29 @@
+@startuml
+title Figure 5.2 – Simplified RaSTA Communication State Machine
+
+[*] --> Disconnected
+
+state Disconnected
+state Connection_Establishment
+state Operational
+state Fault_State
+state Recovery
+
+Disconnected --> Connection_Establishment : Connection Request
+
+Connection_Establishment --> Operational : Session Established
+
+Operational --> Fault_State : CRC Error
+Operational --> Fault_State : Sequence Error
+Operational --> Fault_State : Timeout
+Operational --> Fault_State : Invalid Endpoint
+Operational --> Fault_State : Communication Loss
+
+Fault_State --> Recovery : Recovery Attempt
+
+Recovery --> Operational : Success
+Recovery --> Disconnected : Failure
+
+Operational --> Disconnected : Shutdown
+
+@enduml
