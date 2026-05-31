@@ -611,3 +611,237 @@ provides a robust safety architecture capable of reducing communication-related 
 Verification Result:
 
 ✔ Residual Risk Acceptable
+
+## 7.11 Functional Safety Assessment (FSA)
+
+### 7.11.1 Purpose
+
+EN 50126 and EN 50129 require independent assessment activities throughout the safety lifecycle to ensure that safety objectives are achieved [3][4].
+
+A Functional Safety Assessment (FSA) evaluates whether:
+
+* Safety requirements are complete.
+* Hazards are adequately addressed.
+* Verification activities are sufficient.
+* Safety evidence is acceptable.
+* Residual risk remains tolerable.
+
+The purpose of the FSA is to provide confidence that the developed system satisfies its intended safety objectives.
+
+---
+
+### 7.11.2 Assessment Criteria
+
+The following criteria are considered during the assessment.
+
+| Assessment Area | Evaluation Objective                       |
+| --------------- | ------------------------------------------ |
+| Requirements    | Completeness and traceability              |
+| Hazard Analysis | Identification of communication hazards    |
+| Risk Assessment | Adequacy of risk reduction measures        |
+| Architecture    | Correct implementation of safety functions |
+| Verification    | Evidence of requirement satisfaction       |
+| Safety Case     | Adequacy of supporting evidence            |
+
+---
+
+### 7.11.3 Assessment Results
+
+| Assessment Item         | Result      |
+| ----------------------- | ----------- |
+| Requirements Analysis   | Complete    |
+| Hazard Analysis         | Complete    |
+| Risk Assessment         | Complete    |
+| Safety Functions        | Implemented |
+| Architecture Evaluation | Complete    |
+| Verification Activities | Complete    |
+| Safety Case             | Complete    |
+
+Overall Assessment Result:
+
+✔ Functional Safety objectives achieved
+
+References:
+
+[3][4]
+
+---
+
+## 7.12 Configuration Management
+
+### 7.12.1 Purpose
+
+Configuration Management ensures that all safety-related system components remain controlled throughout the system lifecycle [3].
+
+For communication systems, uncontrolled changes may introduce new hazards or invalidate previously completed verification activities.
+
+Consequently, all modifications must be documented and controlled.
+
+---
+
+### 7.12.2 Configuration Management Activities
+
+The configuration management process includes:
+
+* Version identification
+* Baseline management
+* Change tracking
+* Document control
+* Configuration auditing
+
+These activities help ensure consistency between requirements, architecture, implementation, and verification evidence.
+
+---
+
+### 7.12.3 Project Configuration Baseline
+
+For this project, the configuration baseline includes:
+
+| Configuration Item         | Description              |
+| -------------------------- | ------------------------ |
+| Requirements Specification | Section 3                |
+| Hazard Analysis            | Section 4                |
+| Architecture Design        | Section 5                |
+| Verification Evidence      | Section 6                |
+| Safety Case                | Section 7                |
+| PlantUML Diagrams          | Repository Documentation |
+
+Maintaining a controlled baseline supports future modifications and safety assessments.
+
+References:
+
+[3]
+
+---
+
+## 7.13 Change Management
+
+### 7.13.1 Purpose
+
+Safety-related systems frequently evolve during their operational lifetime.
+
+Any modification has the potential to affect safety performance.
+
+Consequently, EN 50126 and EN 50129 require a structured change management process [3][4].
+
+---
+
+### 7.13.2 Change Management Process
+
+The recommended process consists of:
+
+1. Change Request
+2. Impact Analysis
+3. Hazard Review
+4. Risk Assessment
+5. Approval
+6. Implementation
+7. Verification
+8. Baseline Update
+
+---
+
+### 7.13.3 Example Application
+
+Consider the introduction of a new communication timeout parameter.
+
+The following activities would be required:
+
+* Evaluate impact on timing supervision.
+* Assess potential hazards.
+* Update requirements if necessary.
+* Recalculate safety performance.
+* Repeat relevant verification activities.
+
+This process ensures that modifications do not unintentionally degrade system safety.
+
+References:
+
+[3][4]
+
+---
+
+## 7.14 End-to-End Traceability Matrix
+
+### 7.14.1 Purpose
+
+One of the most important principles of Functional Safety is traceability [1].
+
+Traceability demonstrates how hazards are connected to:
+
+* Safety requirements
+* Safety functions
+* Architectural elements
+* Verification evidence
+
+This ensures that every identified risk is addressed by an implemented safety mechanism.
+
+---
+
+### 7.14.2 Traceability Matrix
+
+| Hazard                        | Safety Requirement | Safety Function | Architecture Element      | Verification Evidence   |
+| ----------------------------- | ------------------ | --------------- | ------------------------- | ----------------------- |
+| H1 Message Corruption         | SR-1               | SF-1            | CRC Module                | CRC Analysis            |
+| H2 Message Loss               | SR-2               | SF-2            | Sequence Manager          | Fault Injection Testing |
+| H3 Message Duplication        | SR-2               | SF-2            | Sequence Manager          | Fault Injection Testing |
+| H4 Message Insertion          | SR-6               | SF-5            | Connection Manager        | Session Verification    |
+| H5 Incorrect Sequence         | SR-3               | SF-2            | Sequence Manager          | Protocol Testing        |
+| H6 Excessive Delay            | SR-4               | SF-3            | Timeout Monitor           | Timing Analysis         |
+| H7 Communication Interruption | SR-5               | SF-4            | Connection Manager        | Connection Monitoring   |
+| H8 Masquerading               | SR-6               | SF-5            | Endpoint Validation Logic | Session Verification    |
+
+---
+
+### 7.14.3 Traceability Assessment
+
+The matrix demonstrates that:
+
+* Every hazard has been addressed.
+* Every safety requirement has an implementation.
+* Every implementation has verification evidence.
+
+This provides complete traceability throughout the project lifecycle.
+
+References:
+
+[1][3][4]
+
+---
+
+## 7.15 Final Safety Conclusion
+
+The Safety Case developed throughout this section demonstrates that the proposed RaSTA communication architecture satisfies its intended safety objectives.
+
+The analysis showed that:
+
+* Communication hazards were systematically identified.
+* Risks were evaluated and reduced through dedicated safety functions.
+* Multiple independent protection mechanisms were implemented.
+* Reliability and availability objectives were achieved.
+* Fault Tree Analysis demonstrated a very low probability of hazardous communication failure.
+* The calculated hazard probability satisfies typical railway THR expectations.
+* Residual risk remains acceptable.
+
+The Safety Case therefore provides structured evidence that the communication architecture can support safety-related railway applications operating over non-safe communication networks.
+
+Consequently, the proposed RaSTA architecture can be considered a suitable communication solution for safety-related railway systems and is consistent with the principles of IEC 61508, EN 50126, EN 50129, and EN 50159 [1][3][4][5][6].
+
+---
+
+### Section 7 Summary
+
+| Topic                        | Status   |
+| ---------------------------- | -------- |
+| Safety Claims                | Complete |
+| Safety Argument              | Complete |
+| Fault Tree Analysis          | Complete |
+| THR Assessment               | Complete |
+| Residual Risk Assessment     | Complete |
+| Functional Safety Assessment | Complete |
+| Configuration Management     | Complete |
+| Change Management            | Complete |
+| Traceability Matrix          | Complete |
+| Safety Conclusion            | Complete |
+
+Section 7 is therefore complete and provides the formal safety justification for the RaSTA communication architecture.
