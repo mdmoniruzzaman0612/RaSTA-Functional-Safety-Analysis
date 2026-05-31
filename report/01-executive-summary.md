@@ -1,0 +1,15 @@
+# 1 Executive Summary
+
+Modern railway systems increasingly depend on distributed safety-related subsystems that exchange information through digital communication networks. As railway infrastructure evolves toward network-based signalling and control architectures, communication systems themselves become part of the overall safety concept [3]. Consequently, communication failures must be considered potential sources of hazardous system behaviour and must be controlled through appropriate functional safety measures [1].
+
+This project investigates the Rail Safe Transport Application (RaSTA), a safety-related communication protocol designed to provide safe data transmission over non-safe communication networks [6]. RaSTA implements the Black Channel Principle defined in EN 50159, allowing standard communication technologies to be used while maintaining the safety properties required by railway applications [5].
+
+The objective of the project is to analyse how RaSTA prevents hazardous communication failures and supports safe communication between railway control systems. The study follows the RAMS lifecycle defined by EN 50126 and applies functional safety principles from IEC 61508 to identify hazards, derive safety requirements, develop a communication architecture, and evaluate the resulting safety performance [1][3].
+
+A systematic hazard analysis is performed to identify communication failures including message corruption, message loss, message duplication, incorrect message sequencing, excessive transmission delays, communication interruption, and masquerading [5]. Based on these hazards, safety functions are derived and mapped to specific RaSTA mechanisms such as Cyclic Redundancy Checks (CRC), sequence supervision, timeout monitoring, connection supervision, and safe-state activation [6].
+
+The communication architecture is evaluated using reliability and safety engineering techniques. Quantitative analyses include availability calculations, reliability calculations, CRC residual error probability estimation, and Fault Tree Analysis (FTA) to assess the probability of hazardous communication failures [9]. These analyses demonstrate that the layered protection mechanisms implemented by RaSTA significantly reduce the likelihood of unsafe communication behaviour.
+
+A safety case is developed to demonstrate that the identified hazards are adequately controlled and that residual risk remains within acceptable limits for safety-related railway communication systems [4]. The results indicate that RaSTA provides an effective framework for achieving safe communication over non-safe transmission channels and supports the functional safety objectives required by modern railway signalling and control systems.
+
+The project concludes that the combination of integrity protection, communication supervision, deterministic fault handling, and fail-safe behaviour makes RaSTA a suitable solution for safety-related railway communication applications [5][6].
