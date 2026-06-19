@@ -1,326 +1,196 @@
-# 3 System Requirements
+# 3. System Requirements
 
 ## 3.1 Introduction
 
-According to the RAMS lifecycle defined in EN 50126, system requirements provide the foundation for the design, implementation, verification, and validation of safety-related railway systems [3]. Requirements must be complete, consistent, traceable, verifiable, and measurable throughout the system lifecycle [1][3].
+This section defines the functional, safety, availability, timing, diagnostic, and configuration requirements for a RaSTA-based communication system. The requirements are derived from the RaSTA protocol specification, DIN VDE V 0831-200 Version 03.03, and from the safety communication objectives of DIN EN 50159 [1].
 
-For safety-related communication systems, requirements are particularly important because communication failures may directly affect the behaviour of railway control applications [4][5]. The requirements defined in this section establish the expected functionality, performance, reliability, availability, maintainability, and safety characteristics of the RaSTA-based communication system.
-
-The purpose of the communication system is to enable safe transmission of application data between railway subsystems while ensuring that communication failures cannot result in hazardous system behaviour [5][6].
+The purpose of these requirements is to establish a traceable basis for the subsequent hazard analysis, architecture analysis, verification activities, and safety case.
 
 ---
 
-## 3.2 Stakeholder Requirements
+## 3.2 Functional Requirements
 
-### Railway Operator
+### FR-1 Safe Communication Service
 
-The railway operator requires:
+The system shall provide a safe communication service for railway signalling applications using the RaSTA protocol stack [1].
 
-* High communication availability
-* Reliable transmission of operational information
-* Minimal service interruptions
-* Predictable system behaviour during failures [3]
+### FR-2 Application Independence
 
-### Safety Authority
+The communication protocol shall be independent of the specific railway application protocol [1].
 
-The safety authority requires:
+### FR-3 Connection Establishment
 
-* Demonstration of compliance with railway safety standards
-* Traceable safety requirements
-* Evidence that communication failures are adequately controlled [4]
+The system shall provide a connection establishment mechanism using Connection Request, Connection Response, and Heartbeat messages [1].
 
-### System Maintainer
+### FR-4 Data Transmission
 
-The maintainer requires:
+The system shall support transmission of application messages using RaSTA Data messages [1].
 
-* Diagnostic information
-* Event logging
-* Fault reporting
-* Support for maintenance and troubleshooting activities [3]
+### FR-5 Retransmission
 
-### Application Developer
+The system shall support retransmission of lost or corrupted user data using Retransmission Request, Retransmission Response, and Retransmitted Data messages [1].
 
-The application developer requires:
+### FR-6 Heartbeat Supervision
 
-* Safe communication services
-* Deterministic protocol behaviour
-* Protection against communication hazards
-* Well-defined protocol interfaces [6]
+The system shall send Heartbeat messages when no data has been transmitted within the configured heartbeat interval (T_h) [1].
+
+### FR-7 Redundant Transmission
+
+The Redundancy Layer shall transmit each message identically over all available transport channels [1].
+
+### FR-8 Transport Independence
+
+The protocol shall support operation over standard transport services such as UDP or TCP [1].
 
 ---
 
-## 3.3 Functional Requirements
+## 3.3 Safety Requirements
 
-### FR-1 Safe Message Transmission
+### SR-1 Message Integrity Verification
 
-The communication system shall transmit safety-related application data between communicating railway applications [6].
+The receiver shall verify the safety code of each received Safety and Retransmission Layer message before further processing [1].
 
-**Verification Method:** Functional Testing
+### SR-2 Sender and Receiver Validation
 
----
+The receiver shall verify that the sender and receiver identifiers match the expected RaSTA connection [1].
 
-### FR-2 Message Integrity Verification
+### SR-3 Message Type Validation
 
-The receiving endpoint shall verify message integrity before delivering data to the application layer [5][6].
+The receiver shall reject undefined message types [1].
 
-**Verification Method:** Protocol Verification Testing
+### SR-4 Sequence Number Supervision
 
----
+The receiver shall verify the sequence number of received messages to detect repetition, replay, omission, loss, insertion, and resequencing [1].
 
-### FR-3 Sequence Verification
+### SR-5 Confirmed Sequence Number Supervision
 
-The receiving endpoint shall verify that messages arrive in the correct order [6].
+The receiver shall verify the confirmed sequence number to ensure that acknowledgements are plausible [1].
 
-**Verification Method:** Sequence Fault Injection Testing
+### SR-6 Timeliness Monitoring
 
----
+The receiver shall verify timeliness of time-monitoring-relevant messages using timestamp and confirmed timestamp information [1].
 
-### FR-4 Duplicate Message Detection
+### SR-7 Connection Failure Detection
 
-The communication system shall detect and reject duplicated messages [5][6].
+The receiver shall terminate the connection when the adaptive monitoring timer (T_i) expires [1].
 
-**Verification Method:** Communication Fault Testing
+### SR-8 Safe Disconnection
 
----
-
-### FR-5 Message Loss Detection
-
-The communication system shall detect missing messages through sequence monitoring and timeout supervision [5].
-
-**Verification Method:** Communication Interruption Testing
+If the protocol detects an unrecoverable error, the connection shall be closed using a Disconnect Request message with an appropriate reason code [1].
 
 ---
 
-### FR-6 Delay Detection
+## 3.4 Availability Requirements
 
-The communication system shall detect messages exceeding the maximum allowable transmission delay [5][6].
+### AR-1 Redundancy Channel
 
-**Verification Method:** Timing Verification
+The system shall support a redundancy channel consisting of one or more transport channels [1].
 
----
+### AR-2 Multi-Channel Transmission
 
-### FR-7 Connection Supervision
+The sender shall transmit each redundancy-layer message on all available transport channels [1].
 
-The communication system shall continuously supervise the communication connection during operation [6].
+### AR-3 Duplicate Handling
 
-**Verification Method:** Connection Monitoring Tests
+The redundancy-layer receiver shall detect duplicate messages received from multiple transport channels [1].
 
----
+### AR-4 Out-of-Sequence Buffering
 
-### FR-8 Endpoint Validation
+The redundancy-layer receiver shall temporarily store out-of-sequence messages in a DeferQueue [1].
 
-The communication system shall validate communication partners before exchanging operational data [5][6].
+### AR-5 Deferred Delivery
 
-**Verification Method:** Connection Establishment Testing
-
----
-
-### FR-9 Diagnostic Reporting
-
-Communication failures shall generate diagnostic information accessible to maintenance personnel [3].
-
-**Verification Method:** Diagnostic Function Testing
+Messages stored in the DeferQueue shall be delivered when missing earlier messages arrive or when the configured timeout (T_{seq}) expires [1].
 
 ---
 
-### FR-10 Safe-State Notification
+## 3.5 Timing Requirements
 
-The communication system shall notify the application whenever communication validity can no longer be guaranteed [1][4].
+### TR-1 Maximum Message Age
 
-**Verification Method:** Failure Response Testing
+The maximum acceptable age of a message shall be defined by the configuration parameter (T_{max}) [1].
 
----
+### TR-2 Heartbeat Interval
 
-## 3.4 Performance Requirements
+Heartbeat messages shall be sent when no message has been sent within the configured interval (T_h) [1].
 
-### PR-1 Maximum End-to-End Latency
+### TR-3 Adaptive Monitoring Timer
 
-The communication system shall support transmission of safety-related messages with a maximum latency of:
+The adaptive monitoring timer (T_i) shall be recalculated after reception of a time-monitoring-relevant message [1].
+
+### TR-4 Timing Constraint for Retransmission
+
+The timing parameters shall satisfy the following relationship [1]:
 
 ```text
-≤ 100 ms
+Tmax > 3 × Th + 2 × (TA + TB) + Tseq
 ```
 
-Justification:
+where:
 
-Safety-related information must remain valid when received by the application [5].
-
----
-
-### PR-2 Communication Fault Detection Time
-
-Communication interruptions shall be detected within:
-
-```text
-≤ 500 ms
-```
-
-Justification:
-
-Rapid detection reduces exposure to unsafe communication states [4][5].
+* (T_{max}) = maximum acceptable message age
+* (T_h) = heartbeat interval
+* (T_A) = transmission time from A to B
+* (T_B) = transmission time from B to A
+* (T_{seq}) = redundancy-layer defer time
 
 ---
 
-### PR-3 Connection Establishment Time
+## 3.6 Diagnostic Requirements
 
-A communication connection shall be established within:
+### DR-1 Error Counters
 
-```text
-≤ 2 seconds
-```
+The system shall maintain diagnostic error counters for:
 
-following initialization.
+* Incorrect safety code
+* Invalid sender or receiver identifier
+* Undefined message type
+* Implausible sequence number
+* Implausible confirmed sequence number [1]
 
----
+### DR-2 Channel Quality Monitoring
 
-## 3.5 Reliability Requirements
+The system shall support diagnostic monitoring of channel quality using (T_{rtd}) and (T_{alive}) values [1].
 
-Reliability is defined as the probability that a system performs its intended function without failure for a specified period of time [3][8].
+### DR-3 Transport Channel Diagnostics
 
-### RR-1 Mission Reliability
-
-The communication system shall achieve:
-
-```text
-Reliability ≥ 99.9%
-```
-
-for a mission duration of 10 hours.
-
-**Verification Method:** Reliability Analysis
+The Redundancy Layer shall provide diagnostic information for each transport channel using values such as (N_{missed}), (T_{drift}), and (T_{drift2}) [1].
 
 ---
 
-### RR-2 Error Detection Reliability
+## 3.7 Configuration Requirements
 
-The probability of failing to detect a communication corruption event shall be less than:
+The system configuration shall include the following Safety and Retransmission Layer parameters:
 
-```text
-10^-9 per message
-```
+| Parameter        | Meaning                                                           |
+| ---------------- | ----------------------------------------------------------------- |
+| (T_{max})        | Maximum acceptable age of a message                               |
+| (T_h)            | Heartbeat interval                                                |
+| Security Code    | None, lower half of MD4, or full MD4                              |
+| MWA              | Maximum number of received unacknowledged messages                |
+| (N_{sendmax})    | Receive buffer capacity exchanged during connection establishment |
+| (N_{maxPackage}) | Maximum packetization factor                                      |
+| (N_{diagWindow}) | Diagnostic measurement window                                     |
 
-**Verification Method:** CRC Analysis
+**Table 3-1:** Safety and Retransmission Layer configuration parameters [1].
 
----
+The Redundancy Layer configuration shall include:
 
-### RR-3 Communication Supervision Reliability
+| Parameter                   | Meaning                                     |
+| --------------------------- | ------------------------------------------- |
+| Number of Physical Channels | Number of transport paths used              |
+| Verification Code           | None, CRC32, CRC32C, CRC16                  |
+| (T_{seq})                   | Time for buffering out-of-sequence messages |
+| (N_{diagnosis})             | Diagnostic measurement window               |
+| (N_{deferQueueSize})        | Maximum DeferQueue size                     |
 
-Communication supervision functions shall detect communication interruptions with high confidence.
-
-**Verification Method:** Fault Injection Testing
-
----
-
-## 3.6 Availability Requirements
-
-Availability is defined as the probability that a system is operational when required [3].
-
-### AR-1 Operational Availability
-
-The communication service shall achieve:
-
-```text
-Availability ≥ 99.99%
-```
-
-**Verification Method:** Availability Analysis
+**Table 3-2:** Redundancy Layer configuration parameters [1].
 
 ---
 
-### AR-2 Service Continuity
+## 3.8 Requirement Traceability Foundation
 
-Temporary communication disturbances shall not result in permanent communication failure.
-
-**Verification Method:** Recovery Testing
-
----
-
-## 3.7 Maintainability Requirements
-
-### MR-1 Diagnostic Logging
-
-All communication failures shall be logged.
-
-**Verification Method:** Diagnostic Testing
-
----
-
-### MR-2 Fault Identification
-
-Diagnostic information shall support identification of communication failure causes.
-
-**Verification Method:** Maintenance Review
-
----
-
-### MR-3 Event History
-
-The system shall maintain a history of communication events and failures.
-
-**Verification Method:** Log Analysis
-
----
-
-## 3.8 Safety Requirements
-
-### SR-1 Corrupted Message Rejection
-
-Corrupted messages shall be detected and rejected before delivery to the application [5][6].
-
----
-
-### SR-2 Duplicate Message Rejection
-
-Duplicated messages shall not be delivered to the application [5][6].
-
----
-
-### SR-3 Sequence Error Detection
-
-Out-of-order messages shall be detected and rejected [6].
-
----
-
-### SR-4 Delay Error Detection
-
-Messages exceeding timing limits shall not be accepted [5][6].
-
----
-
-### SR-5 Communication Interruption Detection
-
-Communication interruptions shall trigger fault handling procedures [5].
-
----
-
-### SR-6 Invalid Endpoint Detection
-
-Communication with unauthorized endpoints shall be prevented [5][6].
-
----
-
-### SR-7 Safe-State Activation
-
-Whenever communication safety cannot be guaranteed, the application shall enter a predefined safe state [1][4].
-
----
-
-## 3.9 RAMS Requirements Summary
-
-| RAMS Category   | Key Requirement                                   |
-| --------------- | ------------------------------------------------- |
-| Reliability     | Reliability ≥ 99.9%                               |
-| Availability    | Availability ≥ 99.99%                             |
-| Maintainability | Diagnostic logging and fault identification       |
-| Safety          | Detection and mitigation of communication hazards |
-
-These RAMS requirements provide measurable targets for evaluating the effectiveness of the RaSTA communication architecture [3].
-
----
-
-## 3.10 Requirements Traceability Foundation
-
-The requirements established in this section form the basis for all subsequent engineering activities.
+The requirements defined in this section provide the basis for the remainder of the report.
 
 ```text
 Requirements
@@ -329,11 +199,11 @@ Hazards
       ↓
 Safety Functions
       ↓
-Architecture
+RaSTA Mechanisms
       ↓
 Verification
       ↓
 Safety Case
 ```
 
-This traceability approach ensures that every architectural component and safety mechanism introduced later in the report can be directly justified by a corresponding requirement and safety objective [1][3][4].
+This traceability ensures that the protocol analysis remains connected to identifiable safety, timing, diagnostic, and availability requirements.
