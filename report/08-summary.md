@@ -1,149 +1,128 @@
-# 8 Summary
+# 8. Summary
 
-## 8.1 Project Objectives
+## 8.1 Report Overview
 
-The objective of this project was to investigate the Rail Safe Transport Application (RaSTA) as a safety-related communication protocol for railway systems and to evaluate its suitability for the safe transmission of information over non-safe communication networks [6].
+This report presented a functional safety analysis of the Rail Safe Transport Application (RaSTA) protocol specified in DIN VDE V 0831-200 Version 03.03.
 
-The study was performed within the framework of Functional Safety and the RAMS lifecycle defined by IEC 61508 and EN 50126 [1][3]. Particular attention was given to communication hazards that may affect safety-related railway applications and to the mechanisms implemented by RaSTA to detect and mitigate these hazards [5][6].
+RaSTA was developed to provide safe and highly available communication for railway signalling applications while satisfying the requirements of DIN EN 50159. The protocol achieves this objective through a layered architecture consisting of a Safety and Retransmission Layer and a Redundancy Layer operating over conventional transport services such as UDP and TCP.
 
-The project aimed to:
-
-* Define communication requirements.
-* Identify communication hazards.
-* Perform risk assessment.
-* Derive safety functions.
-* Analyse the RaSTA architecture.
-* Evaluate reliability and availability.
-* Develop a structured Safety Case.
-
-These objectives were achieved through the activities described throughout the report.
+The analysis focused on the protocol architecture, communication mechanisms, safety functions, verification of protocol behaviour, and safety argumentation.
 
 ---
 
-## 8.2 Main Results
+## 8.2 Main Findings
 
-### Requirements Analysis
+The analysis identified several key mechanisms that contribute to the safety and availability of RaSTA communication.
 
-A complete set of functional, performance, reliability, availability, maintainability, and safety requirements was established for the communication system [1][3].
+### Safe Connection Establishment
 
-These requirements provided measurable objectives and formed the basis for subsequent hazard analysis, architecture development, and verification activities.
+RaSTA establishes communication using a controlled handshake procedure consisting of:
 
----
+```text
+ConnReq
+   →
+ConnResp
+   →
+HB
+```
 
-### Hazard Analysis and Risk Assessment
+This procedure ensures that communication parameters are synchronized before operational communication begins.
 
-Eight major communication hazards were identified based on the communication threat categories defined by EN 50159 [5].
+### Message Integrity Protection
 
-The identified hazards included:
+The protocol uses MD4-based safety codes to detect message corruption before data is delivered to the application.
 
-* Message corruption.
-* Message loss.
-* Message duplication.
-* Message insertion.
-* Incorrect sequencing.
-* Excessive delay.
-* Communication interruption.
-* Masquerading.
+### Sequence Integrity Protection
 
-The risk assessment demonstrated that several of these hazards possess High or Very High risk levels and therefore require dedicated safety mitigation measures [10].
+Sequence numbers and confirmed sequence numbers allow detection of:
 
----
+- Message loss
+- Message repetition
+- Replay
+- Resequencing
+- Message insertion
 
-### Safety Function Development
+### Timeliness Monitoring
 
-Six safety functions were derived to mitigate the identified communication hazards.
+Adaptive timeout supervision ensures that outdated information is not accepted by the receiving application.
 
-These functions included:
+### Retransmission Capability
 
-* Message integrity protection.
-* Sequence supervision.
-* Time supervision.
-* Connection supervision.
-* Endpoint validation.
-* Safe-state activation.
+Lost messages can be recovered through the RetrReq / RetrResp / RetrData mechanism without violating message ordering.
 
-Traceability was established between hazards, safety requirements, safety functions, and architectural elements in accordance with Functional Safety principles [1][4].
+### Communication Redundancy
 
----
-
-### Architectural Analysis
-
-A RaSTA-based communication architecture was developed using the Black Channel Principle defined by EN 50159 [5].
-
-The architecture demonstrated how safety can be achieved without requiring the communication network itself to be safety-certified. Instead, safety-related protection mechanisms are implemented at the communication endpoints through CRC verification, sequence monitoring, timeout supervision, and connection management functions [5][6].
+The Redundancy Layer improves communication availability by using multiple transport channels and constructing a single logical communication channel from them.
 
 ---
 
-### Quantitative Evaluation
+## 8.3 Compliance with DIN EN 50159
 
-The communication architecture was evaluated using several engineering methods.
+The protocol mechanisms were evaluated against the communication threats identified in DIN EN 50159.
 
-The analyses included:
+The analysis demonstrated that RaSTA provides protection against:
 
-* Availability calculations.
-* Reliability calculations.
-* CRC residual error probability estimation.
-* Reliability Block Diagram evaluation.
-* Fault Tree Analysis.
+| Communication Threat | RaSTA Mechanism |
+|----------------------|----------------|
+| Corruption | MD4 Safety Code |
+| Delay | Timeliness Monitoring |
+| Repetition | Sequence Supervision |
+| Deletion | Retransmission |
+| Insertion | Sender and Receiver Validation |
+| Resequencing | Sequence Supervision |
+| Masquerade | Identifier Validation |
 
-The results demonstrated:
-
-* Availability ≈ 99.99%
-* Reliability ≈ 99.90%
-* CRC residual error probability ≈ 2.33 × 10⁻¹⁰
-* Hazardous communication event probability ≈ 2 × 10⁻¹¹
-
-These results indicate that the communication system achieves a high level of dependability and safety [8][9].
+**Table 8-1:** Mapping between DIN EN 50159 threats and RaSTA protections.
 
 ---
 
-## 8.3 Achievement of RAMS Objectives
+## 8.4 Verification Results
 
-The communication system was evaluated against the RAMS framework defined by EN 50126 [3].
+The protocol behaviour was examined using:
 
-### Reliability
+- Connection establishment scenarios
+- Sequence supervision analysis
+- Timeliness monitoring analysis
+- Retransmission scenarios
+- Redundancy-layer operation
+- Fault handling mechanisms
+- Fault Tree Analysis
 
-The calculated reliability satisfies the reliability target established in Section 3.
-
-### Availability
-
-The calculated availability exceeds the required 99.99% target.
-
-### Maintainability
-
-Diagnostic logging, event recording, and fault reporting support maintenance and troubleshooting activities.
-
-### Safety
-
-The combination of CRC protection, sequence supervision, timing supervision, connection supervision, and safe-state activation significantly reduces the probability of hazardous communication failures.
-
-The results demonstrate that the communication architecture supports all RAMS objectives defined for the project [3].
+The results demonstrated that communication failures are either corrected through retransmission or detected and handled through safe connection termination.
 
 ---
 
-## 8.4 Functional Safety Perspective
+## 8.5 Safety Assessment
 
-From a Functional Safety perspective, the project demonstrates the application of several key safety engineering principles [1].
+The safety mechanisms implemented by RaSTA provide multiple independent layers of protection.
 
-These principles include:
+These mechanisms include:
 
-* Hazard-based design.
-* Risk reduction through safety functions.
-* Defense-in-depth.
-* Fail-safe behaviour.
-* Verification and validation.
-* Traceability throughout the lifecycle.
+- Integrity verification
+- Sender validation
+- Receiver validation
+- Sequence verification
+- Timeliness supervision
+- Heartbeat supervision
+- Retransmission procedures
+- Redundancy management
 
-The project also demonstrated how Functional Safety concepts can be applied to communication systems, where communication failures themselves become potential hazards requiring systematic risk control [1][4].
+The protocol therefore exhibits the characteristics expected of a safety-related communication system used in railway signalling environments.
 
 ---
 
-## 8.5 Final Conclusion
+## 8.6 Conclusion
 
-The analyses performed throughout this report demonstrate that RaSTA provides an effective framework for safety-related railway communication [6].
+The functional safety analysis demonstrates that RaSTA provides a robust communication framework for railway signalling systems.
 
-The protocol successfully addresses the communication hazards identified by EN 50159 through multiple independent safety mechanisms operating according to the Black Channel Principle [5]. These mechanisms provide robust protection against message corruption, loss, duplication, incorrect sequencing, excessive delay, communication interruption, and masquerading.
+The protocol successfully combines:
 
-The quantitative analyses indicate that the probability of hazardous communication failures remains extremely low and satisfies typical railway safety expectations [4][9]. Furthermore, the architecture supports the achievement of the RAMS objectives defined by EN 50126 and the Functional Safety principles established by IEC 61508 [1][3].
+- Functional safety
+- Communication integrity
+- Availability enhancement
+- Fault detection
+- Safe failure behaviour
 
-Therefore, RaSTA can be considered a suitable and effective solution for safety-related communication in modern railway systems where safe transmission of information over non-safe communication channels is required.
+The implemented mechanisms ensure that communication faults are detected before unsafe information can influence railway signalling applications.
+
+Consequently, RaSTA provides a suitable and standards-compliant communication solution for safety-related railway systems operating under the requirements of DIN EN 50159.
