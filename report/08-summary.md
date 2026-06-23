@@ -1,121 +1,151 @@
-# 8. Summary
+# 8. Summary and Conclusions
 
 ## 8.1 Report Overview
 
-This report presented a functional safety analysis of the Rail Safe Transport Application (RaSTA) protocol specified in DIN VDE V 0831-200 Version 03.03.
+This report presented a functional safety analysis of the Rail Safe Transport Application (RaSTA) protocol defined in DIN VDE V 0831-200 Version 03.03.
 
-RaSTA was developed to provide safe and highly available communication for railway signalling applications while satisfying the requirements of DIN EN 50159. The protocol achieves this objective through a layered architecture consisting of a Safety and Retransmission Layer and a Redundancy Layer operating over conventional transport services such as UDP and TCP.
+RaSTA is a railway communication protocol designed to provide safe and highly available communication between distributed signalling components while satisfying the requirements of DIN EN 50159. The protocol achieves these objectives through a layered architecture consisting of a Safety and Retransmission Layer and a Redundancy Layer operating over conventional transport services such as UDP and TCP [1][2].
 
-The analysis focused on the protocol architecture, communication mechanisms, safety functions, verification of protocol behaviour, and safety argumentation.
+The analysis examined:
 
----
-
-## 8.2 Main Findings
-
-The analysis identified several key mechanisms that contribute to the safety and availability of RaSTA communication.
-
-### Safe Connection Establishment
-
-RaSTA establishes communication using a controlled handshake procedure consisting of:
-
-```text
-ConnReq
-   →
-ConnResp
-   →
-HB
-```
-
-This procedure ensures that communication parameters are synchronized before operational communication begins.
-
-### Message Integrity Protection
-
-The protocol uses MD4-based safety codes to detect message corruption before data is delivered to the application.
-
-### Sequence Integrity Protection
-
-Sequence numbers and confirmed sequence numbers allow detection of:
-
-- Message loss
-- Message repetition
-- Replay
-- Resequencing
-- Message insertion
-
-### Timeliness Monitoring
-
-Adaptive timeout supervision ensures that outdated information is not accepted by the receiving application.
-
-### Retransmission Capability
-
-Lost messages can be recovered through the RetrReq / RetrResp / RetrData mechanism without violating message ordering.
-
-### Communication Redundancy
-
-The Redundancy Layer improves communication availability by using multiple transport channels and constructing a single logical communication channel from them.
+- Protocol architecture
+- Communication procedures
+- Message formats
+- Safety mechanisms
+- State-machine behaviour
+- Retransmission mechanisms
+- Redundancy concepts
+- Functional correctness
+- Safety compliance
 
 ---
 
-## 8.3 Compliance with DIN EN 50159
+## 8.2 Key Architectural Findings
 
-The protocol mechanisms were evaluated against the communication threats identified in DIN EN 50159.
+The analysis showed that RaSTA separates safety and availability functions into distinct protocol layers.
 
-The analysis demonstrated that RaSTA provides protection against:
+### Safety and Retransmission Layer
 
-| Communication Threat | RaSTA Mechanism |
-|----------------------|----------------|
+Responsible for:
+
+- Connection establishment
+- Message integrity
+- Sequence supervision
+- Timeliness monitoring
+- Heartbeat supervision
+- Retransmission handling
+- Safe disconnection
+
+### Redundancy Layer
+
+Responsible for:
+
+- Multi-channel communication
+- CRC verification
+- Duplicate elimination
+- Message reordering
+- Transport-channel diagnostics
+
+This separation simplifies protocol verification and improves maintainability.
+
+---
+
+## 8.3 Verification Results
+
+The protocol behaviour was analysed using the operational scenarios defined in the RaSTA specification.
+
+The following mechanisms were verified:
+
+| Function | Verification Result |
+|-----------|-------------------|
+| Connection Establishment | Successful handshake verified |
+| Message Integrity | MD4 protection verified |
+| Sequence Supervision | Loss and replay detection verified |
+| Timeliness Monitoring | Adaptive timeout verified |
+| Heartbeat Supervision | Connection monitoring verified |
+| Retransmission | Recovery procedure verified |
+| Redundancy | Multi-channel operation verified |
+| Fault Handling | Safe-state transition verified |
+
+**Table 8-1:** Summary of verification results.
+
+The analysis demonstrated that communication faults are either corrected through retransmission or detected and handled through safe connection termination.
+
+---
+
+## 8.4 Compliance with DIN EN 50159
+
+DIN EN 50159 identifies several communication threats that must be controlled in railway signalling systems.
+
+The analysis demonstrated that RaSTA provides protection against all principal threats.
+
+| EN 50159 Threat | RaSTA Mechanism |
+|-----------------|----------------|
 | Corruption | MD4 Safety Code |
 | Delay | Timeliness Monitoring |
 | Repetition | Sequence Supervision |
 | Deletion | Retransmission |
-| Insertion | Sender and Receiver Validation |
+| Insertion | Identifier Validation |
 | Resequencing | Sequence Supervision |
-| Masquerade | Identifier Validation |
+| Masquerade | Sender/Receiver Validation |
 
-**Table 8-1:** Mapping between DIN EN 50159 threats and RaSTA protections.
-
----
-
-## 8.4 Verification Results
-
-The protocol behaviour was examined using:
-
-- Connection establishment scenarios
-- Sequence supervision analysis
-- Timeliness monitoring analysis
-- Retransmission scenarios
-- Redundancy-layer operation
-- Fault handling mechanisms
-- Fault Tree Analysis
-
-The results demonstrated that communication failures are either corrected through retransmission or detected and handled through safe connection termination.
+**Table 8-2:** Compliance mapping between EN 50159 threats and RaSTA mechanisms.
 
 ---
 
-## 8.5 Safety Assessment
+## 8.5 Functional Safety Assessment
 
-The safety mechanisms implemented by RaSTA provide multiple independent layers of protection.
+The protocol implements multiple independent protection layers.
 
-These mechanisms include:
+These include:
 
-- Integrity verification
+- Safety-code verification
 - Sender validation
 - Receiver validation
 - Sequence verification
-- Timeliness supervision
+- Timestamp verification
 - Heartbeat supervision
 - Retransmission procedures
-- Redundancy management
+- Communication redundancy
 
-The protocol therefore exhibits the characteristics expected of a safety-related communication system used in railway signalling environments.
+The use of independent mechanisms significantly reduces the probability of unsafe communication.
+
+Furthermore, communication validity is continuously monitored throughout the connection lifetime rather than only during connection establishment.
 
 ---
 
-## 8.6 Conclusion
+## 8.6 Limitations
 
-The functional safety analysis demonstrates that RaSTA provides a robust communication framework for railway signalling systems.
+Although RaSTA provides extensive protection against communication faults, some limitations remain.
 
-The protocol successfully combines:
+### Complete Communication Failure
+
+If all transport channels fail simultaneously, communication cannot continue.
+
+### Configuration Errors
+
+Incorrect configuration of:
+
+- Sender IDs
+- Receiver IDs
+- Network identifiers
+- Timing parameters
+
+may prevent correct operation.
+
+### Application-Level Errors
+
+RaSTA protects communication but does not validate application semantics.
+
+Application-specific safety analysis remains necessary.
+
+---
+
+## 8.7 Final Conclusion
+
+The functional safety analysis demonstrates that RaSTA provides a comprehensive communication framework for railway signalling systems.
+
+The protocol combines:
 
 - Functional safety
 - Communication integrity
@@ -123,6 +153,6 @@ The protocol successfully combines:
 - Fault detection
 - Safe failure behaviour
 
-The implemented mechanisms ensure that communication faults are detected before unsafe information can influence railway signalling applications.
+Through the combined use of MD4-based integrity checking, sequence supervision, adaptive timing monitoring, retransmission procedures, and communication redundancy, RaSTA effectively addresses the communication threats defined by DIN EN 50159.
 
-Consequently, RaSTA provides a suitable and standards-compliant communication solution for safety-related railway systems operating under the requirements of DIN EN 50159.
+The protocol therefore represents a suitable and standards-compliant communication solution for safety-related railway signalling applications [1][2][3][5].
