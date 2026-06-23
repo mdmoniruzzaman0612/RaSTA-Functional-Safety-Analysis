@@ -2,116 +2,129 @@
 
 ## 6.1 Introduction
 
-The objective of this section is to demonstrate that RaSTA performs its intended communication functions correctly while maintaining compliance with the safety requirements of railway signalling systems. The analysis is based on the protocol specification defined in DIN VDE V 0831-200 Version 03.03 and evaluates the protocol behaviour during connection establishment, normal operation, retransmission, redundancy management, and fault handling [1].
+The objective of this section is to demonstrate that RaSTA performs its intended communication functions correctly under both normal and abnormal operating conditions.
 
-Correct functional operation is demonstrated by examining the protocol mechanisms and verifying that each mechanism contributes to safe and highly available communication.
+The analysis is based on the protocol behaviour specified in DIN VDE V 0831-200 Version 03.03 and examines:
+
+* Connection establishment
+* Data transmission
+* Timeliness supervision
+* Heartbeat supervision
+* Retransmission behaviour
+* Redundancy operation
+* Fault handling
+
+The analysis uses actual protocol mechanisms defined by the standard rather than theoretical assumptions.
 
 ---
 
-## 6.2 Verification of Connection Establishment
+## 6.2 Verification Strategy
 
-Before user data can be exchanged, RaSTA requires successful completion of a three-message handshake procedure.
+Correct functional operation is demonstrated by verifying that:
 
-The connection establishment sequence is:
+1. Connections are established correctly.
+2. Messages are delivered correctly.
+3. Lost messages are recovered.
+4. Corrupted messages are rejected.
+5. Delayed messages are detected.
+6. Communication failures result in safe behaviour.
+
+The protocol mechanisms are evaluated against the requirements defined in Section 3.
+
+---
+
+## 6.3 Verification of Connection Establishment
+
+RaSTA establishes communication using a three-message handshake procedure.
 
 ```text
-Client                           Server
+Client                          Server
 
 ConnReq ----------------------->
 
-                    <----------- ConnResp
+                     <---------- ConnResp
 
 HB ---------------------------->
 
 Connection State = Up
 ```
 
-The client initiates communication by transmitting a Connection Request (ConnReq). The server responds with a Connection Response (ConnResp). The client then confirms acceptance by sending a Heartbeat (HB) message. Only after completion of this sequence does the connection enter the operational state "Up" [1].
+**Figure 6-1:** Connection establishment sequence.
 
-During this procedure the protocol exchanges:
+The connection request contains:
 
-- Protocol version
-- Sender identifier
-- Receiver identifier
-- Initial sequence numbers
-- Receive buffer size (Nsendmax)
-- Timestamp information
+* Protocol version
+* Sender identifier
+* Receiver identifier
+* Initial sequence number
+* Receive buffer size
 
-The exchange of these parameters ensures both communication partners operate using synchronized protocol data.
+The connection response confirms these parameters.
+
+The final heartbeat message confirms successful synchronization.
+
+Only after this sequence is completed does the protocol enter the operational state **Up**.
 
 ### Verification Result
 
-The protocol establishes communication only after successful completion of the handshake procedure. Partial or incomplete connection establishment cannot result in operational communication. Therefore, the connection establishment mechanism satisfies its functional objective [1].
+The handshake ensures that:
+
+* Both communication partners use compatible protocol versions.
+* Sender and receiver identifiers are verified.
+* Sequence-number synchronization is achieved.
+* Communication cannot begin in an undefined state.
+
+Therefore the connection-establishment mechanism satisfies its intended function [1].
 
 ---
 
-## 6.3 Verification of Message Integrity
+## 6.4 Verification of Message Integrity
 
-Every Safety and Retransmission Layer message contains a safety code generated from the protocol data unit.
+Every Safety and Retransmission Layer message contains an MD4-based safety code.
 
-RaSTA supports the following integrity options:
+Example:
 
-| Option | Integrity Mechanism |
-|----------|----------|
-| 1 | No safety code |
-| 2 | Lower half of MD4 |
-| 3 | Full MD4 |
+| Field           | Value                   |
+| --------------- | ----------------------- |
+| Message Type    | HB (6220)               |
+| Sequence Number | 100                     |
+| Timestamp       | 34567                   |
+| Safety Code     | 93 9F 1C 86 59 CF F5 03 |
 
-**Table 6-1:** Safety-code options [1].
+**Table 6-1:** Example protected message.
 
-Upon reception:
+When the receiver obtains a message:
 
 1. The safety code is recalculated.
 2. The received value is compared with the calculated value.
-3. Invalid messages are discarded.
+3. Messages failing verification are discarded.
 
 ### Verification Result
 
-Any modification of protected message contents causes a safety-code mismatch and prevents the message from being accepted. The integrity mechanism therefore detects corrupted messages before they can reach the application layer [1].
+Any corruption of the protected message fields causes a safety-code mismatch.
+
+Therefore message corruption cannot propagate to the application layer [1][2].
 
 ---
 
-## 6.4 Verification of Sequence Integrity
+## 6.5 Verification of Sequence Integrity
 
-RaSTA uses sequence numbers to ensure correct message ordering and to detect communication failures.
+Sequence integrity is achieved through:
 
-Each protocol data unit contains:
+* Sequence Number (SN)
+* Confirmed Sequence Number (CS)
 
-- Sequence Number (SN)
-- Confirmed Sequence Number (CS)
-
-The sender increments SN for every transmitted message.
-
-The receiver verifies:
+The receiver continuously checks whether:
 
 ```text
-Expected Sequence Number
-=
-Received Sequence Number
+Expected SN = Received SN
 ```
 
-Messages arriving with unexpected sequence numbers are treated as sequence errors.
-
-Sequence supervision detects:
-
-- Message loss
-- Message repetition
-- Message replay
-- Message insertion
-- Message resequencing
-
-### Example
-
-Expected:
+Example:
 
 ```text
-SN = 25
-```
-
-Received:
-
-```text
-SN = 26
+Expected SN = 25
+Received SN = 26
 ```
 
 Result:
@@ -120,26 +133,38 @@ Result:
 Sequence Error Detected
 ```
 
-Retransmission procedure initiated.
+This indicates that message 25 has been lost.
+
+### Threats Detected
+
+Sequence supervision detects:
+
+* Message loss
+* Repetition
+* Replay
+* Message insertion
+* Resequencing
+
+These communication threats are identified by DIN EN 50159 [2].
 
 ### Verification Result
 
-Sequence supervision prevents invalid message ordering and enables reliable detection of communication anomalies [1].
+The sequence-supervision mechanism successfully detects communication anomalies before application processing occurs.
 
 ---
 
-## 6.5 Verification of Timeliness Monitoring
+## 6.6 Verification of Timeliness Monitoring
 
-Safe railway communication requires information to be both correct and sufficiently recent.
+Correct information can become unsafe if delivered too late.
 
-RaSTA implements adaptive timeliness monitoring using:
+RaSTA therefore performs adaptive timeliness supervision using:
 
-- Timestamp (TS)
-- Confirmed Timestamp (CTS)
-- Round-trip delay measurement (Trtd)
-- Connection supervision delay (Talive)
+* Timestamp (TS)
+* Confirmed Timestamp (CTS)
+* Round-trip delay (Trtd)
+* Connection supervision delay (Talive)
 
-The supervision timer is calculated as:
+The supervision timeout is calculated as:
 
 ```text
 Ti = Trtd + Talive + Tmax
@@ -147,29 +172,36 @@ Ti = Trtd + Talive + Tmax
 
 where:
 
-- Ti = adaptive timeout
-- Tmax = maximum acceptable message age
+* Ti = supervision timeout
+* Tmax = maximum acceptable message age
 
-The timer is continuously updated during operation.
+### Example
+
+Measured values:
+
+```text
+Trtd = 12 ms
+Talive = 8 ms
+Tmax = 200 ms
+```
+
+Result:
+
+```text
+Ti = 220 ms
+```
+
+If no valid message arrives before timeout expiration, the connection is terminated.
 
 ### Verification Result
 
-The protocol continuously monitors communication delay and automatically terminates connections when messages become excessively old. This prevents stale information from influencing safety-related applications [1].
+The mechanism prevents stale information from being accepted by the receiving application [1][2].
 
 ---
 
-## 6.6 Verification of Heartbeat Supervision
+## 6.7 Verification of Heartbeat Supervision
 
-Heartbeat messages provide continuous connection supervision.
-
-When no application data has been transmitted during the configured interval Th, a Heartbeat message is sent automatically.
-
-Heartbeat messages perform the following functions:
-
-- Confirm remote availability
-- Update timing measurements
-- Maintain connection supervision
-- Prevent unnecessary connection termination
+Heartbeat messages provide continuous monitoring when no application data is available.
 
 Message type:
 
@@ -177,62 +209,65 @@ Message type:
 HB (6220)
 ```
 
+Heartbeat transmission occurs after:
+
+```text
+Th
+```
+
+milliseconds without outgoing traffic.
+
+Heartbeat functions include:
+
+* Connection supervision
+* Timeliness monitoring
+* Availability monitoring
+* Synchronization maintenance
+
 ### Verification Result
 
-Heartbeat supervision allows communication failures to be detected even during periods when no application data is exchanged. Therefore, the protocol remains observable under all operating conditions [1].
+Communication failures remain detectable even when no user data is exchanged [1].
 
 ---
 
-## 6.7 Verification of Retransmission Behaviour
+## 6.8 Verification of Retransmission Behaviour
 
-Message loss is detected through sequence-number supervision.
+The RaSTA specification defines a retransmission mechanism for recovering lost messages.
 
-When a missing sequence number is identified, the receiver initiates retransmission.
+### Normal Operation
 
-Retransmission procedure:
+```text
+24
+25
+26
+```
+
+### Message Loss
+
+Message:
+
+```text
+25
+```
+
+is lost.
+
+Receiver observes:
+
+```text
+24
+26
+```
+
+The sequence error triggers retransmission.
+
+### Recovery Procedure
 
 ```text
 RetrReq
       →
 RetrResp
       →
-RetrData
-```
-
-The sender retransmits all unacknowledged application data beginning with the missing sequence number.
-
-### Example
-
-Normal transmission:
-
-```text
-24
-25
-26
-```
-
-Lost message:
-
-```text
-25
-```
-
-Received:
-
-```text
-24
-26
-```
-
-Result:
-
-```text
-RetrReq Generated
-```
-
-Sender retransmits:
-
-```text
 RetrData(25)
 RetrData(26)
 ```
@@ -241,15 +276,77 @@ Communication then returns to normal operation.
 
 ### Verification Result
 
-The retransmission mechanism restores communication after message loss while maintaining sequence integrity and message ordering [1].
+The retransmission mechanism restores communication while preserving message order and integrity [1].
 
 ---
 
-## 6.8 Verification of Redundancy Operation
+## 6.9 Verification of Successful Retransmission Scenario
 
-The Redundancy Layer improves communication availability through the use of multiple transport channels.
+The RaSTA specification provides an example retransmission scenario.
 
-Example:
+The receiver expects:
+
+```text
+SN = 25
+```
+
+but receives:
+
+```text
+SN = 26
+```
+
+The protocol performs:
+
+1. Sequence-error detection.
+2. RetrReq transmission.
+3. RetrResp reception.
+4. Retransmission of missing data.
+5. Return to normal communication.
+
+This process is completed without violating sequence integrity.
+
+### Verification Result
+
+Lost messages can be recovered successfully without requiring connection re-establishment.
+
+---
+
+## 6.10 Verification of Failed Retransmission Scenario
+
+The standard also describes a scenario where retransmitted messages are lost repeatedly.
+
+In this case:
+
+```text
+RetrData(25)
+```
+
+is also lost.
+
+The receiver issues another retransmission request.
+
+If communication cannot be restored before timeout Ti expires:
+
+```text
+DiscReq
+```
+
+is generated and the connection enters the Closed state.
+
+### Verification Result
+
+Unsafe communication is terminated rather than accepted.
+
+This behaviour is consistent with functional-safety principles [11].
+
+---
+
+## 6.11 Verification of Redundancy Operation
+
+The Redundancy Layer improves communication availability.
+
+A logical redundancy channel may consist of:
 
 ```text
 Transport Channel A
@@ -257,37 +354,60 @@ Transport Channel B
 Transport Channel C
 ```
 
-A single logical redundancy channel is formed from these transport channels.
+The same message is transmitted simultaneously on all channels.
 
-Every transmitted message is sent simultaneously over all available channels using:
+![Reliability Block Diagram](../figures/figure-6-1-rbd.png)
 
-- Identical payload
-- Identical sequence number
-- Identical CRC value
+**Figure 6-2:** Reliability model of a redundant communication channel.
+
+### Example
+
+Message transmitted:
+
+```text
+SN = 100
+```
+
+Transport Channel A:
+
+```text
+Message Lost
+```
+
+Transport Channel B:
+
+```text
+Message Delivered
+```
+
+The receiver still obtains a valid copy.
 
 ### Verification Result
 
-Failure of an individual transport channel does not necessarily interrupt communication because alternative copies of the message may still arrive through the remaining channels [1].
+Single-channel failures do not necessarily interrupt communication [1].
 
 ---
 
-## 6.9 Verification of DeferQueue Operation
+## 6.12 Verification of DeferQueue Operation
 
-Messages may arrive out of sequence because transport channels have different transmission delays.
-
-The Redundancy Layer stores such messages in a DeferQueue.
+Different transport channels may introduce different delays.
 
 Example:
 
+Expected:
+
 ```text
-Expected: 10
+10
+```
 
 Received:
+
+```text
 11
 12
 ```
 
-Messages 11 and 12 are temporarily stored.
+Messages 11 and 12 are stored temporarily in the DeferQueue.
 
 When message 10 arrives:
 
@@ -295,55 +415,62 @@ When message 10 arrives:
 10
 ```
 
-the queue is released and normal ordering is restored.
-
-If the missing message does not arrive before timeout Tseq expires, the stored message is released.
+the queue is released and ordering is restored.
 
 ### Verification Result
 
-The DeferQueue improves availability while preserving deterministic message ordering [1].
+Message ordering is preserved despite channel-delay differences.
 
 ---
 
-## 6.10 Verification of Fault Handling
+## 6.13 Verification of Fault Handling
 
-RaSTA responds to protocol errors through defined fault-handling mechanisms.
+RaSTA defines deterministic responses for protocol faults.
 
-Examples include:
+| Fault                     | Protocol Response      |
+| ------------------------- | ---------------------- |
+| Invalid Safety Code       | Message Discarded      |
+| Invalid Sender ID         | Message Discarded      |
+| Invalid Message Type      | Message Discarded      |
+| Sequence Error            | Retransmission         |
+| Timeout                   | Connection Termination |
+| Retransmission Failure    | Connection Termination |
+| Protocol Version Mismatch | Connection Rejected    |
 
-| Fault | Protocol Response |
-|---------|---------|
-| Invalid safety code | Message discarded |
-| Invalid sender ID | Message discarded |
-| Invalid message type | Message discarded |
-| Sequence error | Retransmission initiated |
-| Timeliness violation | Connection terminated |
-| Retransmission failure | Connection terminated |
-| Invalid protocol version | Connection terminated |
-
-**Table 6-2:** Fault handling behaviour [1].
-
-When safe communication can no longer be guaranteed, RaSTA transmits a Disconnect Request (DiscReq) and enters the Closed state.
+**Table 6-2:** Fault handling behaviour.
 
 ### Verification Result
 
-The protocol fails safely by terminating communication rather than allowing potentially unsafe information to reach the application [1].
+The protocol transitions to a safe state whenever communication validity cannot be guaranteed.
 
 ---
 
-## 6.11 Summary
+## 6.14 Functional Correctness Argument
 
-The analysis demonstrates that RaSTA correctly performs its intended communication functions.
+The verification activities demonstrate that:
 
-The protocol provides:
+* Connections are established correctly.
+* Messages are protected against corruption.
+* Sequence errors are detected.
+* Delayed information is detected.
+* Lost messages are recovered.
+* Communication failures are handled safely.
+* Availability is improved through redundancy.
 
-- Verified connection establishment
-- Message integrity protection
-- Sequence supervision
-- Timeliness monitoring
-- Heartbeat supervision
-- Retransmission of lost data
-- Communication redundancy
-- Safe fault handling
+The protocol therefore performs its intended communication functions correctly.
 
-These mechanisms operate together to provide safe and highly available communication for railway signalling systems. The protocol therefore satisfies its functional objectives and provides the technical foundation required for compliance with DIN EN 50159 [1].
+---
+
+## 6.15 Conclusion
+
+The analysis demonstrates that RaSTA satisfies its functional objectives through a combination of:
+
+* Safety-code verification
+* Sequence supervision
+* Timeliness monitoring
+* Heartbeat supervision
+* Retransmission procedures
+* Redundancy mechanisms
+* Safe fault handling
+
+The protocol therefore provides a communication framework suitable for safety-related railway signalling systems operating according to DIN EN 50159 requirements.
