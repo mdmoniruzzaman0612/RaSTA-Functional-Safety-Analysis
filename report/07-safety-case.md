@@ -1,118 +1,171 @@
 # 7. Safety Case
 
-## 7.1 Safety Objective
+## 7.1 Introduction
 
-The primary safety objective of RaSTA is to provide safe and highly available communication for railway signalling applications while satisfying the requirements of DIN EN 50159 [1].
+The purpose of this safety case is to demonstrate that the Rail Safe Transport Application (RaSTA) provides communication services that satisfy the safety objectives defined for railway signalling systems.
 
-The protocol shall ensure that communication failures cannot lead to the acceptance of incorrect, incomplete, delayed, duplicated, or unauthorized information by safety-related railway applications.
+RaSTA was specifically developed to provide safe communication in accordance with DIN EN 50159 and to support safety-related railway applications operating under the RAMS framework defined by EN 50126, EN 50128, and EN 50129 [2][3][4][5].
 
 The fundamental safety principle of RaSTA is:
 
-> Unsafe communication shall be detected before it can influence the application.
+> Unsafe communication shall never be accepted by the receiving application.
 
-Whenever safe communication can no longer be guaranteed, the protocol transitions to a safe state by terminating the connection.
-
----
-
-## 7.2 Communication Threats According to DIN EN 50159
-
-DIN EN 50159 identifies several communication threats that must be addressed by safety-related communication systems.
-
-The principal threats are:
-
-| Threat | Description |
-|----------|----------|
-| Corruption | Modification of transmitted information |
-| Repetition | Repeated transmission of previously valid data |
-| Deletion | Loss of transmitted information |
-| Delay | Information arrives too late |
-| Insertion | Unauthorized creation of messages |
-| Resequencing | Messages arrive in the wrong order |
-| Masquerade | Communication partner impersonation |
-
-**Table 7-1:** Communication threats defined by DIN EN 50159.
-
-Failure to detect these threats could result in incorrect signalling decisions and potentially hazardous railway operating conditions.
+Whenever communication validity cannot be guaranteed, the protocol transitions to a predefined safe state by terminating the connection.
 
 ---
 
-## 7.3 Hazard Identification
+## 7.2 Safety Objectives
+
+The primary safety objectives of RaSTA are:
+
+1. Detect message corruption.
+2. Detect delayed messages.
+3. Detect lost messages.
+4. Detect repeated messages.
+5. Detect message resequencing.
+6. Detect unauthorized communication.
+7. Maintain communication availability.
+8. Prevent unsafe information from reaching the application.
+
+These objectives directly address the communication threats identified by DIN EN 50159 [2].
+
+---
+
+## 7.3 DIN EN 50159 Communication Threat Analysis
+
+DIN EN 50159 identifies several communication threats that must be controlled by safety-related communication systems.
+
+| Threat       | Description                              |
+| ------------ | ---------------------------------------- |
+| Corruption   | Modification of message contents         |
+| Repetition   | Repeated transmission of a valid message |
+| Deletion     | Loss of a message                        |
+| Delay        | Excessive transmission delay             |
+| Insertion    | Unauthorized message creation            |
+| Resequencing | Incorrect message order                  |
+| Masquerade   | Sender impersonation                     |
+
+**Table 7-1:** Communication threats defined by DIN EN 50159 [2].
+
+These threats form the basis of the RaSTA safety architecture.
+
+---
+
+## 7.4 Hazard Identification
 
 The communication threats can be translated into system-level hazards.
 
-| Hazard ID | Hazard Description | Potential Consequence |
-|------------|------------------|----------------------|
-| H-1 | Corrupted safety message accepted | Incorrect control action |
-| H-2 | Delayed safety message accepted | Decision based on obsolete information |
-| H-3 | Lost message not detected | Missing safety command |
-| H-4 | Repeated message accepted | Duplicate execution of command |
-| H-5 | Message sequence error undetected | Inconsistent system state |
-| H-6 | Unauthorized sender accepted | Unsafe command execution |
-| H-7 | Communication failure undetected | Loss of situational awareness |
+| Hazard ID | Hazard Description               | Possible Consequence            |
+| --------- | -------------------------------- | ------------------------------- |
+| H-1       | Corrupted command accepted       | Incorrect signalling action     |
+| H-2       | Delayed information accepted     | Decision based on obsolete data |
+| H-3       | Lost command undetected          | Missing safety function         |
+| H-4       | Duplicate command accepted       | Repeated action execution       |
+| H-5       | Unauthorized sender accepted     | Unsafe system operation         |
+| H-6       | Message order violation          | Inconsistent application state  |
+| H-7       | Communication failure undetected | Loss of situational awareness   |
 
 **Table 7-2:** Hazard identification for RaSTA communication.
 
 ---
 
-## 7.4 Safety Mechanisms Implemented by RaSTA
+## 7.5 Risk Assessment
 
-RaSTA implements multiple independent safety mechanisms to mitigate communication hazards.
+The identified hazards were assessed qualitatively using the railway RAMS approach.
 
-| Threat | Safety Mechanism |
-|----------|----------|
-| Corruption | MD4 Safety Code |
-| Repetition | Sequence Number Verification |
-| Deletion | Sequence Number Monitoring and Retransmission |
-| Delay | Timestamp and Adaptive Timeout Monitoring |
-| Insertion | Sender and Receiver Identifier Validation |
-| Resequencing | Sequence Number Verification |
-| Masquerade | Sender and Receiver Identifier Validation |
-| Channel Failure | Redundancy Layer |
+![Risk Matrix](../figures/figure-4-1-risk-matrix.png)
 
-**Table 7-3:** Mapping of threats to RaSTA safety mechanisms.
+**Figure 7-1:** Risk matrix used during hazard evaluation.
 
-The use of multiple independent mechanisms increases fault detection coverage and reduces the likelihood of hazardous communication failures.
+Without mitigation, several communication hazards could potentially lead to unsafe railway operation.
+
+Therefore dedicated safety mechanisms are required.
 
 ---
 
-## 7.5 Integrity Protection Argument
+## 7.6 Safety Mechanisms Implemented by RaSTA
 
-Every Safety and Retransmission Layer message contains a safety code generated using MD4.
+RaSTA employs multiple independent safety mechanisms.
+
+| Safety Mechanism            | Purpose                    |
+| --------------------------- | -------------------------- |
+| MD4 Safety Code             | Integrity verification     |
+| Sender ID Validation        | Source authentication      |
+| Receiver ID Validation      | Destination verification   |
+| Sequence Number Supervision | Ordering verification      |
+| Confirmed Sequence Numbers  | Delivery verification      |
+| Timestamp Monitoring        | Timeliness verification    |
+| Heartbeat Messages          | Availability monitoring    |
+| Retransmission Mechanism    | Recovery from message loss |
+| Redundancy Layer            | Availability improvement   |
+
+**Table 7-3:** Principal RaSTA safety mechanisms.
+
+The use of multiple independent mechanisms increases fault detection coverage.
+
+---
+
+## 7.7 Threat-to-Mechanism Mapping
+
+The relationship between DIN EN 50159 threats and RaSTA protections is shown below.
+
+| EN 50159 Threat | RaSTA Protection Mechanism                |
+| --------------- | ----------------------------------------- |
+| Corruption      | MD4 Safety Code                           |
+| Repetition      | Sequence Number Verification              |
+| Deletion        | Retransmission Procedure                  |
+| Delay           | Adaptive Timeout Monitoring               |
+| Insertion       | Sender and Receiver Validation            |
+| Resequencing    | Sequence Number Verification              |
+| Masquerade      | Sender and Receiver Identifier Validation |
+
+**Table 7-4:** Mapping between communication threats and RaSTA mechanisms.
+
+This mapping demonstrates that all principal EN 50159 communication threats are addressed.
+
+---
+
+## 7.8 Integrity Safety Argument
+
+Message corruption is controlled using the safety code field.
+
+The sender calculates an MD4 value over the complete protocol data unit.
 
 Upon reception:
 
-1. The safety code is recalculated.
-2. The received value is compared with the calculated value.
-3. Messages failing verification are discarded.
+```text
+Receive Message
+       ↓
+Calculate MD4
+       ↓
+Compare Safety Code
+       ↓
+Accept or Reject
+```
 
-This mechanism prevents corrupted messages from reaching the application layer.
+**Figure 7-2:** Integrity verification process.
 
-Safety Argument:
+If the calculated value differs from the received value:
 
 ```text
-Message Corruption
+Safety Code Error
         ↓
-MD4 Verification
-        ↓
-Corruption Detected
-        ↓
-Message Rejected
-        ↓
-Safe State Maintained
+Message Discarded
 ```
+
+Therefore corrupted information cannot be delivered to the application [1][9].
 
 ---
 
-## 7.6 Sequence Integrity Argument
+## 7.9 Sequence Integrity Safety Argument
 
 Sequence numbers provide protection against:
 
-- Repetition
-- Replay
-- Deletion
-- Resequencing
-
-The receiver continuously compares the received sequence number with the expected value.
+* Repetition
+* Replay
+* Deletion
+* Resequencing
+* Message insertion
 
 Example:
 
@@ -124,219 +177,217 @@ Received SN = 26
 Result:
 
 ```text
-Sequence Error Detected
+Sequence Error
 ```
 
-The protocol immediately initiates retransmission procedures.
-
-Safety Argument:
+The receiver immediately initiates:
 
 ```text
-Missing Message
-        ↓
-Sequence Error
-        ↓
-Retransmission Request
-        ↓
-Data Recovery
-        ↓
-Safe Communication Restored
+RetrReq
 ```
+
+This prevents missing or reordered messages from being accepted.
 
 ---
 
-## 7.7 Timeliness Safety Argument
+## 7.10 Timeliness Safety Argument
 
-Correct information can become unsafe if delivered too late.
+Correct information may become unsafe if delivered too late.
 
-RaSTA continuously measures:
+RaSTA therefore continuously monitors communication timing.
 
-- Round-trip delay (Trtd)
-- Connection supervision delay (Talive)
-
-The adaptive timeout is calculated as:
+Adaptive supervision uses:
 
 ```text
 Ti = Trtd + Talive + Tmax
 ```
 
-If the timer expires:
+If timeout Ti expires:
 
 ```text
 DiscReq
-        ↓
+       ↓
 Closed State
 ```
 
-The protocol therefore prevents stale information from reaching the application.
+The connection is terminated before obsolete information can be accepted.
 
-Safety Argument:
-
-```text
-Excessive Delay
-        ↓
-Adaptive Timeout
-        ↓
-Connection Termination
-        ↓
-Unsafe Data Prevented
-```
+This directly addresses the delay threat identified in DIN EN 50159 [2].
 
 ---
 
-## 7.8 Availability and Redundancy Argument
+## 7.11 Availability Safety Argument
 
-Communication availability is increased through redundant transport channels.
+Availability is increased through the Redundancy Layer.
+
+The same message is transmitted on multiple transport channels.
 
 Example:
 
 ```text
-Channel A
-Channel B
-Channel C
+      Message
+         |
+ -------------------
+ |        |        |
+A        B        C
 ```
 
-The same message is transmitted simultaneously on all available channels.
-
-Consequently:
-
-- Failure of a single transport channel does not necessarily interrupt communication.
-- Availability increases with the number of independent channels.
-- Safety behaviour remains unchanged.
-
-Safety Argument:
+If one channel fails:
 
 ```text
-Single Channel Failure
-        ↓
-Alternative Channel Available
-        ↓
-Message Delivered
-        ↓
-Communication Maintained
+Channel A = Failed
+Channel B = Operational
+Channel C = Operational
 ```
+
+Communication may continue using the remaining channels.
+
+This reduces the probability of communication interruption.
 
 ---
 
-## 7.9 Fault Tree Analysis
+## 7.12 Fault Tree Analysis
 
-The top-level hazardous event considered in this analysis is:
+The top-level hazardous event considered is:
 
 ```text
 Unsafe Railway Communication
 ```
 
-The corresponding fault tree is shown in Figure 7-2.
+The corresponding fault tree is shown below.
 
 ![Fault Tree Analysis](../figures/figure-7-2-fta.png)
 
-**Figure 7-2:** Fault Tree Analysis of unsafe railway communication.
+**Figure 7-3:** Fault tree for unsafe railway communication.
 
 The top event may result from:
 
-- Corrupted communication
-- Lost communication
-- Delayed communication
-- Unauthorized communication
+* Corrupted communication
+* Delayed communication
+* Lost communication
+* Unauthorized communication
 
-RaSTA interrupts these fault paths using:
-
-- MD4 verification
-- Sequence supervision
-- Timeliness supervision
-- Sender identification
-- Redundancy mechanisms
-
-The fault tree demonstrates that multiple independent failures would generally be required before unsafe communication could occur.
+RaSTA interrupts these fault paths through independent detection mechanisms.
 
 ---
 
-## 7.10 Residual Risks
+## 7.13 Failure Handling and Safe State
 
-Despite the extensive protection mechanisms provided by RaSTA, some residual risks remain.
+When communication validity cannot be guaranteed, RaSTA enters a safe state.
 
-Examples include:
+Typical triggers include:
+
+* Timeout expiration
+* Invalid safety code
+* Protocol version mismatch
+* Retransmission failure
+* Protocol sequence violation
+
+The protocol generates:
+
+```text
+DiscReq
+```
+
+and transitions to:
+
+```text
+Closed
+```
+
+No further application data is accepted.
+
+This behaviour is consistent with fail-safe design principles defined by IEC 61508 [11][12][13].
+
+---
+
+## 7.14 Residual Risks
+
+Although RaSTA significantly reduces communication risk, some residual risks remain.
 
 ### Complete Network Failure
 
-Simultaneous failure of all transport channels can prevent communication.
+Simultaneous failure of all transport channels may prevent communication.
 
 Mitigation:
 
-- Safe timeout detection
-- Controlled connection termination
+* Timeout detection
+* Safe connection termination
 
 ### Configuration Errors
 
 Incorrect configuration of:
 
-- Sender identifiers
-- Receiver identifiers
-- Timing parameters
-- Security-code initialization values
+* Sender identifiers
+* Receiver identifiers
+* Timing parameters
+* MD4 initialization values
 
 may prevent correct operation.
 
 Mitigation:
 
-- Verification and validation activities
-- Configuration management
+* Verification and validation activities
+* Configuration management
 
 ### Application-Level Errors
 
-RaSTA protects communication but does not validate application semantics.
+RaSTA validates communication but not application semantics.
 
 Mitigation:
 
-- Application-level safety analysis
-- Independent functional verification
+* Application-level safety analysis
+* Independent software verification
 
 ---
 
-## 7.11 Safety Claim and Evidence
-
-The safety argument for RaSTA can be summarized as follows.
+## 7.15 Safety Claim
 
 ### Claim
 
-RaSTA provides safe communication for railway signalling applications.
+RaSTA provides safe communication suitable for railway signalling applications.
 
 ### Evidence
 
-- Safety-code verification
-- Sequence-number supervision
-- Timeliness monitoring
-- Heartbeat supervision
-- Retransmission procedures
-- Redundancy mechanisms
+The protocol implements:
+
+* Integrity verification
+* Sequence supervision
+* Timeliness monitoring
+* Heartbeat supervision
+* Retransmission procedures
+* Redundancy mechanisms
+* Safe failure behaviour
 
 ### Verification
 
-- Protocol specification analysis
-- State-machine verification
-- Retransmission scenarios
-- Timing analysis
-- Fault Tree Analysis
+The mechanisms were verified through:
+
+* Protocol analysis
+* State-machine analysis
+* Connection-establishment analysis
+* Retransmission scenarios
+* Fault Tree Analysis
 
 ### Conclusion
 
-The implemented mechanisms collectively detect communication failures before they can result in unsafe behaviour.
+Communication failures are either corrected or detected before they can influence the application.
 
 ---
 
-## 7.12 Safety Conclusion
+## 7.16 Safety Conclusion
 
 The analysis demonstrates that RaSTA provides a comprehensive set of safety mechanisms addressing the communication threats identified by DIN EN 50159.
 
 The protocol detects:
 
-- Corruption
-- Delay
-- Message loss
-- Message repetition
-- Message resequencing
-- Unauthorized communication
+* Corruption
+* Delay
+* Message loss
+* Message repetition
+* Message resequencing
+* Unauthorized communication
 
-When communication validity cannot be guaranteed, RaSTA transitions to a safe state by terminating the connection.
+Whenever safe communication can no longer be guaranteed, RaSTA transitions to a safe state by terminating the connection.
 
-Therefore, the protocol provides a suitable communication foundation for safety-related railway signalling systems and satisfies the safety objectives defined by DIN EN 50159 [1].
+Therefore, RaSTA provides a suitable communication framework for safety-related railway signalling systems and satisfies the safety objectives defined by DIN EN 50159 [1][2].
