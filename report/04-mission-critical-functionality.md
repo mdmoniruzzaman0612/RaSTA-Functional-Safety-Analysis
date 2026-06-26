@@ -64,7 +64,7 @@ One of the most important innovations of RaSTA is its adaptive approach to commu
 
 ![Adaptive Channel Monitoring](../figures/figure-4-1-adaptive-channel-monitoring.png)
 
-**Figure 4-2. Adaptive channel monitoring (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 4-1.** Adaptive channel monitoring (adapted from DIN VDE V 0831-200 [1]).
 
 Instead of relying on fixed timeout values, the protocol continuously measures communication behaviour by monitoring round-trip delays and heartbeat timing. These measurements are used to calculate dynamic supervision timers that reflect current network conditions.
 

@@ -16,9 +16,9 @@ This chapter introduces the overall architecture of the protocol, explains its p
 
 RaSTA is positioned between the application software and the underlying transport network. It provides safety-related communication services without requiring modifications to existing communication infrastructures such as Ethernet or IP networks.
 
-![Classification and Delimitation of the RaSTA Specification](../figures/figure-2-1-classification-delimitation.png)
+![Classification and Delimitation of the RaSTA Specification](../figures/figure-2-1-rasta-specification-scope.png)
 
-**Figure 2-1. Classification and delimitation of the RaSTA specification (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 2-1.** Classification and delimitation of the RaSTA specification (adapted from DIN VDE V 0831-200 [1]).
 
 Figure 2-1 illustrates the scope of the RaSTA specification. The protocol standard primarily defines two protocol layers:
 
@@ -37,9 +37,9 @@ The standard therefore focuses on defining communication safety mechanisms rathe
 
 The layered architecture is one of the key design principles of the RaSTA protocol.
 
-![RaSTA Protocol Layers](../figures/figure-2-2-protocol-layers-message-frame.png)
+![RaSTA Protocol Layers](../figures/figure-2-2-rasta-protocol-layers.png)
 
-**Figure 2-2. RaSTA protocol layers and message structure (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 2-2.** RaSTA protocol layers and message structure (adapted from DIN VDE V 0831-200 [1]).
 
 As shown in Figure 2-2, communication is divided into several independent layers.
 
@@ -79,9 +79,9 @@ Furthermore, faults occurring in one layer remain isolated and cannot directly m
 
 Communication between the protocol layers is achieved through standardized interfaces.
 
-![Protocol Interfaces](../figures/figure-2-3-protocol-interfaces.png)
+![Protocol Stack Interfaces](../figures/figure-2-3-protocol-stack-interfaces.png)
 
-**Figure 2-3. Interfaces within the RaSTA protocol stack (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 2-3.** Interfaces within the RaSTA protocol stack (adapted from DIN VDE V 0831-200 [1]).
 
 The protocol specification distinguishes between **compatibility-relevant** and **non-compatibility-relevant** interfaces.
 

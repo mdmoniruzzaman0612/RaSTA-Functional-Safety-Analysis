@@ -2,435 +2,621 @@
 
 ## 6.1 Introduction
 
-The previous chapter examined the internal architecture of the Rail Safe Transport Application (RaSTA) protocol, including its communication layers, message formats, protocol state machine, and redundancy mechanisms. While these architectural elements explain how the protocol is constructed, they do not demonstrate how the protocol behaves during actual communication.
+The previous chapter examined the architecture of the Rail Safe Transport Application (RaSTA) protocol and explained the mechanisms responsible for ensuring communication safety and availability. While these architectural components describe how the protocol is constructed, they do not by themselves demonstrate that the protocol behaves correctly during real communication.
 
-To verify that the protocol satisfies its functional safety objectives, DIN VDE V 0831-200 defines several operational scenarios representing both normal communication and abnormal communication conditions. These scenarios illustrate the dynamic behaviour of the protocol throughout the complete communication lifecycle, including connection establishment, normal data exchange, retransmission, communication failures, and recovery procedures.
+Functional safety requires evidence that the implemented mechanisms operate correctly under both normal and abnormal operating conditions. For this reason, DIN VDE V 0831-200 provides a number of operational scenarios illustrating how the protocol reacts during connection establishment, communication delays, retransmission, protocol errors, and communication failures.
 
-Rather than presenting isolated protocol functions, the scenarios demonstrate how multiple safety mechanisms interact during realistic communication events. Sequence supervision, adaptive timing, retransmission, heartbeat monitoring, and state transitions operate simultaneously to ensure that communication remains safe even when faults occur within the transmission network.
+These scenarios are especially valuable because they demonstrate the interaction between multiple protocol mechanisms. Sequence supervision, heartbeat monitoring, adaptive timing, retransmission, and deterministic state transitions work together to detect, isolate, and recover from communication faults before incorrect information reaches the signalling application.
 
-This chapter analyses these operational scenarios and evaluates how they demonstrate the correct functional operation of the protocol.
-
----
-
-# 6.2 Verification Through Operational Scenarios
-
-One of the strengths of the RaSTA specification is that it defines not only protocol structures but also complete communication scenarios illustrating expected protocol behaviour.
-
-Each scenario serves as an executable example of the protocol specification.
-
-Instead of describing isolated protocol functions, the standard demonstrates how multiple mechanisms interact under realistic operating conditions.
-
-The scenarios analysed in this chapter include:
-
-- Successful connection establishment
-- Delayed connection response
-- Delayed heartbeat
-- Protocol version incompatibility
-- Normal data exchange
-- Successful retransmission
-- Failed retransmission
-
-Together, these scenarios demonstrate that the protocol behaves deterministically during both normal and abnormal operating conditions.
+This chapter analyses the operational scenarios defined by the standard and evaluates how they provide evidence that the protocol satisfies its functional safety objectives.
 
 ---
 
-# 6.3 Functional Verification Criteria
+## 6.2 Functional Verification Strategy
 
-The behaviour of each scenario is evaluated according to several functional safety criteria derived from DIN EN 50159.
+Unlike many communication protocols that focus primarily on performance, RaSTA continuously verifies communication correctness throughout the lifetime of every connection.
 
-The protocol shall demonstrate that it is capable of:
+The protocol evaluates several independent properties simultaneously:
 
-- Establishing synchronized communication.
-- Detecting communication faults.
-- Recovering from temporary transmission errors.
-- Detecting communication interruption.
-- Preventing obsolete information from reaching the application.
-- Entering a predefined safe state whenever recovery is impossible.
+- Message integrity
+- Sequence correctness
+- Communication timing
+- Sender authenticity
+- Receiver authenticity
+- Connection state
+- Communication availability
 
-These criteria form the basis for the following analysis.
+Only when every verification step is successful is the received message delivered to the signalling application.
+
+This layered verification strategy significantly reduces the probability that communication faults remain undetected.
+
+The operational scenarios analysed in this chapter demonstrate how these verification mechanisms behave during realistic communication situations.
 
 ---
 
-# 6.4 Successful Connection Establishment
+## 6.3 Successful Connection Establishment
 
-The first operational scenario demonstrates successful establishment of communication between two RaSTA instances.
+The first operational scenario illustrates successful initialization of communication between two RaSTA instances.
 
-![Successful Connection Establishment](../figures/figure-5-2-successful-connection-establishment.png)
+![Successful Connection Establishment](../figures/figure-6-1-successful-connection-establishment.png)
 
 **Figure 6-1. Successful connection establishment (adapted from DIN VDE V 0831-200 [1]).**
 
-The communication begins when the client transmits a **Connection Request**.
+The communication process begins when the client transmits a **Connection Request (ConnReq)**.
 
-The request contains the information required to initialize communication, including the protocol version, sender and receiver identifiers, random sequence number, receive buffer capacity, and communication timing information.
+The server validates the received request and responds with a **Connection Response (ConnResp)** containing its own communication parameters.
 
-Upon successful verification of the received request, the server replies with a **Connection Response**.
+Finally, the client transmits a **Heartbeat (HB)** message confirming that communication synchronization has been completed successfully.
 
-This response confirms that both communication partners agree on the communication parameters required for subsequent protocol operation.
+Only after these three protocol messages have been exchanged do both communication partners enter the **Up** state.
 
-Finally, the client transmits a **Heartbeat** message.
+At this point, application messages may be exchanged safely.
 
-Receipt of this heartbeat confirms that both communication partners have entered synchronized communication states.
+---
 
-Only after this three-stage handshake do both protocol instances transition into the **Up** state, allowing application messages to be exchanged.
+## 6.4 Step-by-Step Analysis
 
-This scenario demonstrates that communication begins only after complete synchronization has been achieved.
+The communication procedure shown in Figure 6-1 can be analysed in four distinct stages.
 
-From a functional safety perspective, this prevents partially initialized communication sessions from influencing railway signalling applications.
+### Stage 1 – Communication Request
 
-# 6.5 Delayed Connection Response
+The initiating communication partner sends a Connection Request containing:
 
-The previous scenario demonstrated successful connection establishment under normal operating conditions. However, safety-related communication must also behave predictably when expected protocol messages are delayed or lost.
+- sender identifier,
+- receiver identifier,
+- protocol version,
+- random sequence number,
+- timing information,
+- receive buffer size.
 
-The second operational scenario defined by DIN VDE V 0831-200 examines the case where the **Connection Response** does not arrive within the permitted time interval.
+The receiving communication partner validates every field before continuing.
+
+---
+
+### Stage 2 – Parameter Verification
+
+After successful validation, the receiver creates a Connection Response.
+
+During this step both communication partners verify:
+
+- protocol compatibility,
+- communication identifiers,
+- receive buffer capacities,
+- sequence number initialization,
+- message integrity.
+
+If any inconsistency is detected, communication is terminated immediately.
+
+---
+
+### Stage 3 – Synchronization
+
+The client transmits the first Heartbeat message.
+
+Although Heartbeat messages later supervise idle communication, the first Heartbeat has a special purpose.
+
+It confirms that both communication partners have completed initialization successfully and now possess identical protocol contexts.
+
+---
+
+### Stage 4 – Normal Communication
+
+Following successful synchronization, both communication partners transition into the **Up** state.
+
+Normal application communication may now begin.
+
+During this operational phase, every transmitted message continues to perform communication supervision through sequence numbers, timestamps, acknowledgements, and integrity verification.
+
+---
+
+## 6.5 Functional Safety Assessment
+
+The connection establishment scenario demonstrates several important functional safety principles.
+
+First, communication is never established immediately after receiving a Connection Request.
+
+Instead, both communication partners independently verify protocol compatibility before entering operational communication.
+
+Second, random sequence numbers prevent protocol messages belonging to previous communication sessions from being accepted during new communication sessions.
+
+Third, synchronization is not considered complete until the first Heartbeat has been exchanged successfully.
+
+Finally, deterministic state transitions ensure that communication proceeds identically in every compliant RaSTA implementation.
+
+Together these mechanisms establish a trusted communication context before safety-related information is exchanged.
+
+---
+
+## 6.6 Verification Results
+
+The successful connection establishment scenario demonstrates that the protocol satisfies several fundamental communication safety objectives.
+
+| Verification Objective | Result |
+|------------------------|--------|
+| Protocol compatibility verified | ✓ |
+| Sender and receiver identified | ✓ |
+| Sequence numbers synchronized | ✓ |
+| Adaptive timing initialized | ✓ |
+| Communication buffers negotiated | ✓ |
+| Safe transition into Up state | ✓ |
+
+**Table 6-1. Functional verification performed during successful connection establishment.**
+
+The analysed scenario demonstrates that communication begins only after every required protocol parameter has been verified successfully.
+
+This conservative initialization procedure significantly reduces the probability that communication faults influence subsequent protocol behaviour.
+
+---
+
+## 6.7 Section Summary
+
+The first operational scenario demonstrates that RaSTA establishes communication through a carefully controlled synchronization procedure rather than a simple connection request.
+
+Every stage of the handshake contributes directly to communication safety by verifying protocol compatibility, synchronizing communication parameters, and confirming that both protocol instances have entered identical operational states.
+
+The following section analyses abnormal connection establishment scenarios, including delayed protocol messages and protocol incompatibilities, to demonstrate how RaSTA behaves when communication initialization cannot be completed successfully.
+
+## 6.8 Delayed Connection Response
+
+Successful communication requires both communication partners to complete the connection establishment procedure within predefined timing limits. If the expected **Connection Response (ConnResp)** does not arrive within the maximum permissible time, the protocol assumes that communication cannot be established safely.
+
+The following scenario illustrates this situation.
 
 ![Delayed Connection Response](../figures/figure-6-2-delayed-connection-response.png)
 
-**Figure 6-2. Failed connection establishment due to an excessive delay of the Connection Response (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 6-2. Delayed Connection Response during connection establishment (adapted from DIN VDE V 0831-200 [1]).**
 
-After transmitting the Connection Request, the client starts a supervision timer while waiting for the corresponding Connection Response.
+After transmitting the Connection Request, the initiating communication partner starts a supervision timer.
 
-The protocol defines a maximum acceptable delay (**Tmax**) for reply messages. If the Connection Response does not arrive before this timeout expires, the connection attempt is considered unsuccessful.
+Normally, the receiver validates the request and immediately returns a Connection Response. However, if the response is delayed because of communication failures, excessive network latency, or receiver malfunction, the supervision timer eventually expires.
 
-Instead of waiting indefinitely, the client terminates the connection establishment procedure and returns to the **Closed** state.
+Rather than waiting indefinitely, the client terminates the connection attempt and returns to the **Closed** state.
 
-No application data is exchanged because synchronization between the two communication partners has not yet been completed.
-
-### Functional Safety Analysis
-
-This behaviour prevents communication from being established using uncertain or incomplete protocol information.
-
-Without a timeout mechanism, a delayed Connection Response might be accepted long after the communication context had become invalid, increasing the risk of synchronization errors or replayed messages.
-
-By enforcing strict timing constraints during connection establishment, RaSTA guarantees that every communication session begins from a well-defined and synchronized state.
+No application data is exchanged because synchronization between both communication partners has not yet been completed.
 
 ---
 
-# 6.6 Delayed Heartbeat During Connection Establishment
+### Technical Analysis
 
-Successful connection establishment requires not only the exchange of the Connection Request and Connection Response, but also the successful completion of the final Heartbeat message.
+The timeout mechanism serves several important engineering purposes.
 
-The following scenario illustrates communication failure caused by excessive delay of this Heartbeat.
+First, it prevents protocol resources from remaining allocated indefinitely during failed connection attempts.
+
+Second, it avoids communication using incomplete synchronization information.
+
+Finally, it guarantees deterministic behaviour because every implementation responds identically whenever the timeout expires.
+
+The timeout therefore acts as an additional communication safety barrier during protocol initialization.
+
+---
+
+### Functional Safety Assessment
+
+From a functional safety perspective, delaying communication is preferable to accepting uncertain communication.
+
+If a delayed Connection Response were accepted after the protocol context had already become invalid, communication partners could begin exchanging messages using inconsistent sequence numbers or outdated timing information.
+
+By immediately terminating unsuccessful connection attempts, RaSTA ensures that every communication session begins from a fully synchronized state.
+
+---
+
+## 6.9 Delayed Heartbeat
+
+The final stage of connection establishment requires transmission of the first **Heartbeat (HB)** message.
+
+Although Heartbeat messages later supervise idle communication, the first Heartbeat has a special role because it confirms successful synchronization between both communication partners.
+
+The following scenario demonstrates communication failure caused by an excessive Heartbeat delay.
 
 ![Delayed Heartbeat](../figures/figure-6-3-delayed-heartbeat.png)
 
-**Figure 6-3. Failed connection establishment caused by an excessive Heartbeat delay (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 6-3. Delayed Heartbeat during connection establishment (adapted from DIN VDE V 0831-200 [1]).**
 
-After transmitting the Connection Response, the server waits for the Heartbeat generated by the client.
+After receiving the Connection Response, the server waits for the synchronization Heartbeat generated by the client.
 
-The Heartbeat confirms that both communication partners have completed synchronization and are ready for normal operation.
+If the Heartbeat arrives within the configured supervision interval, communication enters the **Up** state.
 
-If this Heartbeat does not arrive before the supervision timer expires, the server assumes that communication has failed.
+However, if the Heartbeat is delayed beyond the permitted timeout, the synchronization procedure remains incomplete.
 
-The protocol therefore terminates the connection establishment procedure and returns to the Closed state.
+The server therefore concludes that communication cannot be trusted and immediately terminates the connection establishment procedure.
 
-Since the synchronization process remains incomplete, application communication is never started.
-
-### Functional Safety Analysis
-
-The Heartbeat serves as more than a simple "keep-alive" message.
-
-During connection establishment it acts as the final confirmation that both communication partners possess identical protocol information.
-
-By refusing to enter the Up state until this confirmation has been received, RaSTA prevents partially synchronized communication sessions that could otherwise produce inconsistent protocol behaviour.
-
-This demonstrates the protocol's deterministic approach to communication safety.
+Both communication partners return to the **Closed** state.
 
 ---
 
-# 6.7 Client-Detected Protocol Error
+### Technical Analysis
 
-Another important connection establishment scenario involves detection of protocol incompatibility during the handshake.
+The first Heartbeat performs two independent functions.
 
-The following figure illustrates communication failure caused by a client-side protocol error.
+It confirms that the client has received and accepted the Connection Response.
 
-![Client Detected Error](../figures/figure-6-4-client-detected-error.png)
+It also verifies that both communication partners have entered identical protocol states before application communication begins.
 
-**Figure 6-4. Connection establishment terminated after detection of a protocol error by the client (adapted from DIN VDE V 0831-200 [1]).**
+Without this confirmation, the server cannot distinguish between successful initialization and communication failure.
 
-After receiving the Connection Response, the client verifies several protocol parameters before accepting the connection.
+Consequently, the synchronization Heartbeat provides the final verification step before operational communication.
 
-Among the most important checks are:
+---
+
+### Functional Safety Assessment
+
+This scenario demonstrates the conservative design philosophy adopted throughout RaSTA.
+
+Rather than assuming that communication has been established successfully after transmitting the Connection Response, the protocol requires explicit confirmation from the communication partner.
+
+Only after receiving this confirmation does communication become operational.
+
+This approach significantly reduces the probability of partially initialized communication sessions.
+
+---
+
+## 6.10 Client-Detected Protocol Error
+
+Another important operational scenario concerns protocol errors detected during connection establishment.
+
+The following figure illustrates communication termination after the client detects an invalid Connection Response.
+
+![Client Detected Protocol Error](../figures/figure-6-4-client-detected-protocol-error.png)
+
+**Figure 6-4. Client-detected protocol error during connection establishment (adapted from DIN VDE V 0831-200 [1]).**
+
+After receiving the Connection Response, the client performs several verification procedures before accepting the communication session.
+
+Typical verification steps include:
 
 - Protocol version compatibility
-- Sender identifier
-- Receiver identifier
-- Message integrity
-- Security code
+- Sender identification
+- Receiver identification
+- Security Code verification
+- Message format verification
+- Sequence number validation
 
-If any of these verification procedures fails, the Connection Response is rejected.
+If any verification step fails, the Connection Response is rejected immediately.
 
-Instead of attempting communication with incompatible protocol parameters, the client immediately sends a **Disconnect Request** and terminates the communication attempt.
+Instead of attempting communication using uncertain protocol parameters, the client generates a **Disconnect Request** and terminates the communication session.
 
-The protocol therefore returns directly to the Closed state.
-
-### Functional Safety Analysis
-
-Protocol compatibility is essential for deterministic communication.
-
-Even small differences in protocol interpretation could cause different implementations to process identical messages differently, resulting in unpredictable behaviour.
-
-By validating protocol compatibility before entering the operational state, RaSTA guarantees that only compatible implementations exchange safety-related information.
-
-This behaviour supports interoperability while simultaneously preventing unsafe communication caused by software incompatibility.
+Communication therefore returns directly to the **Closed** state.
 
 ---
 
-# 6.8 Evaluation of Connection Establishment
+### Technical Analysis
 
-The four connection establishment scenarios analysed in this chapter demonstrate that RaSTA does not simply attempt to establish communication under all circumstances.
+Unlike many general-purpose communication protocols, RaSTA performs protocol verification before communication becomes operational.
 
-Instead, communication is permitted only when every stage of the synchronization procedure has been completed successfully.
+Every field contained within the Connection Response contributes to communication correctness.
 
-Successful connection establishment requires:
+If one parameter differs from the expected value, deterministic communication can no longer be guaranteed.
 
-- successful exchange of the Connection Request;
-- successful exchange of the Connection Response;
-- successful transmission of the synchronization Heartbeat;
-- compatible protocol versions;
-- valid protocol timing.
-
-Failure of any one of these conditions causes the protocol to terminate communication immediately.
-
-This conservative approach reflects the fail-safe philosophy of railway communication systems, where communication uncertainty is considered more dangerous than temporary communication interruption.
-
-The analysed scenarios therefore provide practical evidence that the connection establishment procedure satisfies the communication safety principles defined by DIN EN 50159.
-
-# 6.9 Normal Data Exchange
-
-After successful completion of the connection establishment procedure, both communication partners enter the **Up** state and begin exchanging application data. During this operational phase, the protocol continuously supervises communication while simultaneously delivering application messages to the signalling system.
-
-Unlike conventional communication protocols, every transmitted message contributes to both information exchange and communication supervision. Consequently, communication safety is continuously evaluated throughout the lifetime of the connection rather than only during connection establishment.
-
-The following operational scenario illustrates normal communication between two synchronized RaSTA instances.
-
-![Normal Data Exchange](../figures/figure-6-5-data-exchange.png)
-
-**Figure 6-5. Normal exchange of application data and heartbeat messages (adapted from DIN VDE V 0831-200 [1]).**
-
-Application messages are transmitted whenever new signalling information becomes available.
-
-If no application data is generated during the configured heartbeat interval (**Th**), the protocol automatically transmits a Heartbeat message.
-
-From the viewpoint of the receiver, both Data messages and Heartbeat messages are considered valid time-monitoring messages. Every correctly received message updates the communication timing information and restarts the adaptive supervision timer.
-
-Consequently, communication remains continuously supervised even during long periods without application traffic.
-
-The scenario also demonstrates that sequence numbers increase continuously throughout normal communication. Every successfully received message advances the expected receive sequence number, ensuring that the receiver always knows which message should arrive next.
-
-### Functional Safety Analysis
-
-This scenario demonstrates that RaSTA combines communication supervision with ordinary data transmission instead of treating them as separate protocol activities.
-
-Application messages contribute simultaneously to:
-
-- application data delivery;
-- sequence number supervision;
-- communication timing supervision;
-- acknowledgement of previously received messages;
-- verification of communication integrity.
-
-This integrated approach minimises communication overhead while ensuring continuous functional safety monitoring.
+For this reason, the protocol rejects the complete communication session instead of attempting partial recovery.
 
 ---
 
-# 6.10 Successful Retransmission
+### Functional Safety Assessment
 
-Although communication networks used within railway systems are generally highly reliable, temporary packet loss remains possible.
+Protocol compatibility is fundamental to functional safety.
 
-Rather than immediately terminating communication after detecting a missing message, RaSTA first attempts to recover the missing information using a controlled retransmission procedure.
+Even small implementation differences could result in two communication partners interpreting identical protocol messages differently.
 
-The following operational scenario illustrates a successful retransmission.
+Such inconsistent behaviour would violate the deterministic operation required by railway signalling systems.
+
+By validating every protocol parameter before entering the operational state, RaSTA prevents incompatible implementations from exchanging safety-related information.
+
+---
+
+## 6.11 Evaluation of Connection Establishment Failures
+
+The three failure scenarios analysed in this section demonstrate that RaSTA never attempts to establish communication under uncertain conditions.
+
+Instead, communication is permitted only after all synchronization procedures have completed successfully.
+
+The analysed scenarios show that the protocol correctly detects:
+
+- delayed communication,
+- missing synchronization,
+- incompatible protocol implementations,
+- invalid protocol parameters.
+
+Whenever one of these conditions occurs, the protocol terminates communication before application data can be exchanged.
+
+This behaviour reflects the fail-safe philosophy of railway communication systems, where communication uncertainty is considered more hazardous than temporary communication interruption.
+
+---
+
+## 6.12 Section Summary
+
+The abnormal connection establishment scenarios provide further evidence that RaSTA satisfies the functional safety principles defined by DIN EN 50159.
+
+Delayed protocol messages, missing synchronization, and protocol incompatibilities are all detected before operational communication begins.
+
+Rather than attempting uncertain recovery, the protocol safely terminates communication and returns to the **Closed** state.
+
+The next section analyses normal operational communication, including application data exchange, successful retransmission, and failed retransmission, demonstrating how RaSTA maintains communication safety throughout the lifetime of an established connection.
+
+## 6.13 Normal Data Exchange
+
+After successful completion of the connection establishment procedure, both communication partners enter the **Up** state. This state represents normal protocol operation, where application data can be exchanged while the protocol continuously supervises communication.
+
+Unlike conventional transport protocols, RaSTA does not separate application communication from communication supervision. Every transmitted protocol message contributes simultaneously to information transfer, message acknowledgement, sequence verification, and timing supervision.
+
+The normal communication process is illustrated in Figure 6-5.
+
+![Normal Data Exchange](../figures/figure-6-5-normal-data-exchange.png)
+
+**Figure 6-5. Normal exchange of application data during the Up state (adapted from DIN VDE V 0831-200 [1]).**
+
+During normal operation, application messages are transmitted whenever new signalling information becomes available.
+
+Each protocol message contains:
+
+- Application data
+- Sequence Number (SN)
+- Confirmed Sequence Number (CS)
+- Timestamp (TS)
+- Confirmed Timestamp (CTS)
+- Security Code
+
+The receiving communication partner validates every field before delivering the application data.
+
+Whenever a valid protocol message is received, the receiver:
+
+1. Verifies the Security Code.
+2. Checks the sender and receiver identifiers.
+3. Verifies the sequence number.
+4. Updates the adaptive timing information.
+5. Stores the confirmed sequence number.
+6. Delivers the application data.
+
+If no application messages are available before the heartbeat timer expires, a Heartbeat message is transmitted automatically.
+
+Heartbeat messages therefore guarantee continuous communication supervision even during idle communication periods.
+
+---
+
+### Engineering Analysis
+
+This communication model provides several advantages.
+
+Application traffic and communication supervision are integrated into a single protocol message.
+
+Acknowledgements are transmitted implicitly through Confirmed Sequence Numbers.
+
+Communication timing is continuously monitored without generating unnecessary protocol traffic.
+
+Consequently, communication safety is maintained with relatively low communication overhead.
+
+---
+
+### Functional Safety Assessment
+
+The normal communication scenario demonstrates that communication supervision is continuous rather than event-based.
+
+Every protocol message contributes simultaneously to:
+
+- message integrity verification;
+- sequence supervision;
+- timing supervision;
+- acknowledgement processing;
+- communication availability.
+
+This integrated design significantly reduces the probability that communication faults remain undetected.
+
+---
+
+## 6.14 Successful Retransmission
+
+Despite the high reliability of railway communication networks, occasional packet loss cannot be completely eliminated.
+
+Rather than immediately terminating communication whenever a message is lost, RaSTA first attempts controlled recovery using its retransmission mechanism.
+
+The following operational scenario illustrates successful retransmission.
 
 ![Successful Retransmission](../figures/figure-6-6-successful-retransmission.png)
 
-**Figure 6-6. Successful retransmission following the loss of a protocol message (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 6-6. Successful retransmission after the loss of a protocol message (adapted from DIN VDE V 0831-200 [1]).**
 
-In this example, message **25** is lost during transmission.
+In this example, one protocol message is lost during transmission.
 
-The next transmitted message (**26**) reaches the receiver successfully.
+The receiver subsequently receives the following message.
 
-However, because the receiver expects sequence number **25**, the received message immediately fails sequence verification.
+Because the received Sequence Number does not match the expected value, the protocol immediately detects the missing message.
 
-Instead of forwarding message 26 to the application, the protocol temporarily suspends application communication.
+Instead of forwarding incomplete application data to the signalling application, communication proceeds through the following sequence:
 
-The receiver then performs the following sequence of operations:
+1. Detect missing Sequence Number.
+2. Enter the **RetrReq** state.
+3. Generate a **Retransmission Request (RetrReq)**.
+4. Wait for the sender's response.
+5. Receive the missing messages as **RetrData**.
+6. Restore sequence synchronization.
+7. Return automatically to the **Up** state.
 
-1. Detects the sequence discontinuity.
-2. Sends a **Retransmission Request (RetrReq)**.
-3. Waits for the sender's response.
-4. Receives the **Retransmission Response (RetrResp)**.
-5. Receives the missing application messages as **RetrData**.
-6. Restores communication synchronization.
-7. Returns automatically to the **Up** state.
-
-Throughout this process, no incomplete application data is delivered.
-
-Only after all missing messages have been received successfully does the protocol continue normal communication.
-
-### Functional Safety Analysis
-
-This scenario demonstrates one of the principal advantages of the RaSTA protocol.
-
-Instead of disconnecting after every isolated communication error, the protocol first attempts controlled recovery.
-
-Communication availability therefore increases significantly because temporary packet loss no longer causes unnecessary interruption of signalling communication.
-
-At the same time, communication safety remains uncompromised because application data is withheld until the original message sequence has been restored completely.
-
-The retransmission procedure therefore represents an effective balance between availability and deterministic communication behaviour.
+Only after all missing messages have been received successfully does the protocol release the buffered application data.
 
 ---
 
-# 6.11 Timing Behaviour During Retransmission
+### Engineering Analysis
 
-An important aspect of the retransmission procedure concerns communication timing.
+Retransmission allows communication to recover from temporary network disturbances without interrupting the communication session.
 
-Even while retransmission is in progress, the protocol continues supervising message freshness using its adaptive timing mechanism.
+The sender maintains a retransmission buffer containing previously transmitted messages.
 
-The specification derives a relationship between the principal timing parameters:
+Whenever a Retransmission Request is received, the sender identifies the missing sequence numbers and retransmits only the required messages.
 
-- **Tmax** – Maximum acceptable message age
-- **Th** – Heartbeat interval
-- **TA** – Processing time of communication partner A
-- **TB** – Processing time of communication partner B
-- **Tseq** – Delay introduced by the Redundancy Layer
-
-The standard specifies that the maximum acceptable communication delay should satisfy:
-
-\[
-T_{max} > 3T_h + 2(T_A + T_B) + T_{seq}
-\]
-
-This relationship ensures that retransmission can complete successfully before application information becomes obsolete.
-
-Rather than relying on arbitrary timeout values, the protocol derives its communication timing from measurable communication behaviour.
-
-This adaptive approach provides significantly greater robustness than conventional fixed-time supervision methods.
+This selective retransmission reduces communication overhead while restoring protocol synchronization efficiently.
 
 ---
 
-# 6.12 Failed Retransmission
+### Functional Safety Assessment
 
-Not every communication fault can be corrected successfully.
+Successful retransmission demonstrates one of the most important design objectives of RaSTA.
 
-The following scenario demonstrates communication failure during the retransmission procedure.
+Temporary communication failures do not immediately result in communication loss.
+
+Instead, the protocol first attempts deterministic recovery while preventing incomplete information from reaching the application.
+
+Communication availability therefore increases significantly without reducing communication safety.
+
+---
+
+## 6.15 Failed Retransmission
+
+Not every communication disturbance can be corrected successfully.
+
+The following operational scenario illustrates communication failure during retransmission.
 
 ![Failed Retransmission](../figures/figure-6-7-failed-retransmission.png)
 
-**Figure 6-7. Communication failure caused by unsuccessful retransmission (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 6-7. Failed retransmission resulting in safe communication termination (adapted from DIN VDE V 0831-200 [1]).**
 
-Initially, communication proceeds exactly as in the previous scenario.
+Initially, communication proceeds exactly as in the successful retransmission scenario.
 
-A missing message is detected and the retransmission procedure begins normally.
+A missing protocol message is detected and the retransmission procedure begins normally.
 
-However, during retransmission another protocol message is lost.
+However, during retransmission another protocol message is also lost.
 
-Consequently, the retransmitted message sequence itself becomes incomplete.
+Consequently, the receiver is unable to reconstruct the complete communication sequence.
 
-The receiver therefore detects a second sequence discontinuity while still recovering from the first communication failure.
+Meanwhile, the adaptive supervision timer continues monitoring communication delay.
 
-The protocol immediately generates another Retransmission Request.
+Eventually the maximum permitted communication time is exceeded.
 
-Meanwhile, the adaptive supervision timer continues counting.
+Because communication correctness can no longer be guaranteed, the protocol terminates the communication session.
 
-Eventually, communication exceeds the maximum acceptable timing limit.
+Both communication partners return to the **Closed** state.
 
-The supervision timer expires.
+---
 
-The protocol therefore concludes that communication correctness can no longer be guaranteed.
+### Engineering Analysis
 
-A Disconnect Request is transmitted and the communication session returns to the **Closed** state.
+The retransmission mechanism is intentionally limited.
 
-### Functional Safety Analysis
+Recovery is attempted only while communication timing remains within the limits defined by the adaptive supervision algorithm.
 
-This scenario demonstrates one of the most important principles of functional safety engineering.
+Once these limits are exceeded, further recovery attempts are abandoned because delayed application information may no longer represent the current railway system state.
 
-Recovery is attempted whenever communication can still be restored safely.
+The protocol therefore favours communication correctness over prolonged recovery attempts.
+
+---
+
+### Functional Safety Assessment
+
+This scenario clearly demonstrates the fail-safe philosophy of RaSTA.
+
+The protocol attempts recovery whenever safe recovery remains possible.
 
 However, recovery is never allowed to continue indefinitely.
 
-Once adaptive timing supervision determines that communication has become excessively delayed, the protocol intentionally abandons the recovery procedure and terminates communication.
+Once communication freshness can no longer be guaranteed, the protocol intentionally disconnects rather than risking delivery of outdated signalling information.
 
-This behaviour prevents outdated signalling information from reaching the railway application.
-
-The protocol therefore prioritises communication correctness over communication availability.
+This behaviour directly satisfies the communication safety principles defined by DIN EN 50159.
 
 ---
 
-# 6.13 Evaluation of Operational Behaviour
+## 6.16 Operational Behaviour Analysis
 
-The operational scenarios analysed throughout this section demonstrate that the RaSTA protocol behaves deterministically under both normal and abnormal operating conditions.
+The three operational scenarios analysed in this section demonstrate that RaSTA behaves predictably throughout normal communication.
 
-During normal communication, every protocol message contributes simultaneously to information transfer, communication supervision, acknowledgement processing, and adaptive timing measurement.
+During normal operation:
 
-When communication disturbances occur, the protocol first attempts controlled recovery through retransmission.
+- communication is continuously supervised;
+- application messages are verified before delivery;
+- heartbeat messages maintain supervision during idle periods.
 
-Only when recovery becomes impossible or communication timing exceeds the permitted safety limits does the protocol intentionally terminate the communication session.
+When communication disturbances occur:
 
-This behaviour illustrates the layered defence philosophy of RaSTA.
+- missing messages are detected immediately;
+- retransmission restores communication whenever possible;
+- communication is terminated safely whenever recovery becomes impossible.
 
-Rather than relying on any single communication safeguard, the protocol combines sequence supervision, adaptive timing, heartbeat monitoring, retransmission, and deterministic state management into a coordinated communication safety strategy.
+These scenarios demonstrate that RaSTA combines deterministic protocol behaviour with controlled fault recovery, providing both high communication availability and strong functional safety.
 
-The analysed scenarios therefore provide practical evidence that the protocol satisfies the communication safety objectives defined by DIN EN 50159 while maintaining the high communication availability required for modern railway signalling systems.
+## 6.17 Verification Against Functional Safety Objectives
 
-# 6.14 Verification of Functional Safety Objectives
+The operational scenarios analysed throughout this chapter demonstrate that the Rail Safe Transport Application (RaSTA) protocol behaves deterministically under both normal and abnormal communication conditions. Rather than assuming that the underlying communication network behaves correctly, the protocol continuously evaluates communication integrity throughout the lifetime of every connection.
 
-The operational scenarios presented throughout this chapter demonstrate that the RaSTA protocol consistently satisfies the functional safety objectives introduced in Chapter 3. Rather than relying on assumptions regarding the reliability of the communication network, the protocol continuously evaluates communication correctness throughout the entire communication session.
+Each operational scenario illustrates the interaction of multiple protocol mechanisms. Sequence number supervision, adaptive timing, heartbeat monitoring, retransmission, and deterministic state transitions operate together to detect communication faults before incorrect information reaches the signalling application.
 
-Each operational scenario illustrates the interaction of multiple protocol mechanisms. During normal communication, sequence supervision, adaptive timing, message integrity verification, and heartbeat monitoring operate simultaneously without requiring intervention from the application layer. When communication faults occur, retransmission procedures attempt to restore communication while adaptive timing supervision ensures that outdated information cannot remain valid indefinitely.
+From a functional safety perspective, these mechanisms provide two complementary objectives:
 
-The protocol therefore provides two complementary properties that are essential for railway signalling systems:
+- **Communication Integrity**, ensuring that only correct and complete information reaches the application.
+- **Communication Availability**, ensuring that temporary communication faults are recovered whenever safe recovery remains possible.
 
-- **Safety**, by ensuring that incorrect or outdated information is never delivered to the application.
-- **Availability**, by recovering from temporary communication faults whenever safe recovery remains possible.
-
-This balance between availability and safety represents one of the principal engineering strengths of the RaSTA protocol.
-
----
-
-# 6.15 Compliance with DIN EN 50159
-
-The communication threats identified in DIN EN 50159 provide the benchmark against which safety-related communication protocols are evaluated.
-
-Table 6-1 summarises how the operational behaviour demonstrated in the previous scenarios addresses these threats.
-
-| DIN EN 50159 Communication Threat | Operational Behaviour Demonstrated | RaSTA Response |
-|----------------------------------|------------------------------------|----------------|
-| Message corruption | Integrity verification during message reception | Corrupted messages are discarded immediately. |
-| Message loss | Successful retransmission scenario | Missing messages are recovered before application delivery. |
-| Message duplication | Sequence number supervision | Duplicate messages are rejected automatically. |
-| Replay | Random initial sequence numbers and sequence verification | Previously transmitted messages are not accepted as valid. |
-| Message resequencing | Sequence supervision and Defer Queue | Messages are delivered in the correct order. |
-| Excessive delay | Adaptive timing supervision | Delayed messages trigger safe disconnection when timing limits are exceeded. |
-| Communication interruption | Heartbeat supervision | Missing communication is detected through timeout monitoring. |
-| Protocol incompatibility | Connection establishment verification | Incompatible implementations are prevented from communicating. |
-
-**Table 6-1. Relationship between operational scenarios and the communication threats defined in DIN EN 50159.**
-
-The analysed scenarios demonstrate that every principal communication threat identified by the standard is addressed by one or more protocol mechanisms. More importantly, no single mechanism is solely responsible for communication safety. Instead, multiple independent checks operate together to provide layered protection against communication faults.
+The combination of these objectives allows RaSTA to provide dependable communication without compromising railway safety.
 
 ---
 
-# 6.16 Discussion
+## 6.18 Verification Against DIN EN 50159
 
-The operational scenarios reveal several important characteristics of the RaSTA protocol.
+DIN EN 50159 identifies several communication threats that must be considered whenever safety-related information is transmitted through an open or shared communication network.
 
-First, communication is deterministic. Every protocol event results in a predefined response, allowing different implementations to behave identically under identical operating conditions. This determinism simplifies interoperability testing and supports formal safety certification.
+The operational behaviour demonstrated in the previous scenarios provides evidence that RaSTA addresses each of these threats through dedicated protocol mechanisms.
 
-Second, communication recovery is conservative. The protocol attempts retransmission whenever communication can still be restored safely, thereby improving system availability. However, recovery is never allowed to continue indefinitely. Adaptive timing supervision continuously evaluates message freshness, ensuring that obsolete information is never accepted simply because recovery is technically possible.
+| Communication Threat (DIN EN 50159) | RaSTA Mechanism | Operational Evidence |
+|-------------------------------------|-----------------|----------------------|
+| Message corruption | Security Code verification | Invalid messages are rejected before delivery. |
+| Message loss | Retransmission | Lost messages are recovered whenever possible. |
+| Message duplication | Sequence Number supervision | Duplicate messages are discarded automatically. |
+| Message resequencing | Sequence Number verification | Messages are delivered only in the correct order. |
+| Replay of old messages | Random initial Sequence Numbers | Messages from previous communication sessions are rejected. |
+| Excessive communication delay | Adaptive timing supervision | Communication is terminated when timing limits are exceeded. |
+| Communication interruption | Heartbeat supervision | Missing communication is detected automatically. |
+| Incompatible implementations | Protocol version negotiation | Communication is refused before entering the Up state. |
 
-Third, the protocol follows a strict fail-safe philosophy. Whenever the correctness of communication can no longer be guaranteed, the protocol intentionally terminates the communication session rather than risking the delivery of uncertain information. Although this may temporarily reduce system availability, it preserves the integrity of the railway signalling application, which is the primary objective of functional safety.
+**Table 6-2. Relationship between DIN EN 50159 communication threats and the RaSTA operational mechanisms.**
 
-Finally, the analysed scenarios demonstrate that the Safety and Retransmission Layer and the Redundancy Layer operate as complementary components. While retransmission improves the probability of successful communication, redundancy reduces the likelihood that retransmission becomes necessary in the first place by providing multiple independent transport paths.
+The analysis shows that no communication threat is mitigated by only one protocol function. Instead, several independent mechanisms cooperate to provide layered protection against communication failures.
+
+This multi-layered design significantly increases confidence in the overall safety of the communication system.
 
 ---
 
-# 6.17 Chapter Summary
+## 6.19 Discussion
 
-This chapter analysed the dynamic behaviour of the Rail Safe Transport Application protocol using the operational scenarios defined in DIN VDE V 0831-200. These scenarios demonstrated how the protocol behaves during successful communication, communication delays, protocol incompatibilities, normal data exchange, retransmission, and communication failure.
+The operational scenarios reveal several important engineering characteristics of the RaSTA protocol.
 
-The analysis showed that RaSTA continuously supervises communication using multiple independent mechanisms, including message integrity verification, sequence number monitoring, heartbeat supervision, adaptive timing, retransmission, and deterministic state transitions. These mechanisms cooperate to detect communication faults before they influence railway signalling applications.
+First, protocol behaviour remains completely deterministic. Every communication event produces one clearly defined response specified by the standard, allowing independent implementations to behave identically under identical operating conditions.
 
-The retransmission scenarios illustrated that the protocol prioritises safe recovery whenever communication can still be restored. When recovery is no longer possible, adaptive timing supervision ensures that the communication session is terminated before outdated information can be delivered to the application. This behaviour demonstrates the protocol's fail-safe design philosophy and its compliance with the communication safety principles defined by DIN EN 50159.
+Second, communication supervision remains active throughout the entire communication session. Unlike traditional transport protocols, which often verify communication only during connection establishment or error recovery, RaSTA continuously validates message integrity, sequence numbers, timing information, and communication state.
 
-Having established that the protocol operates correctly under both normal and abnormal conditions, the next chapter develops the **Safety Case** by evaluating how the combined protocol mechanisms provide evidence that RaSTA satisfies the functional safety requirements expected of modern railway signalling communication systems.
+Third, the protocol follows a conservative recovery strategy. Temporary communication failures are corrected using retransmission whenever safe recovery remains possible. However, once communication freshness or synchronization can no longer be guaranteed, the protocol abandons recovery and safely terminates the communication session.
+
+Finally, the operational scenarios demonstrate the complementary relationship between the Safety and Retransmission Layer and the Redundancy Layer. While retransmission restores missing information, redundancy reduces the likelihood that retransmission becomes necessary by increasing communication availability through multiple transport channels.
+
+Together these mechanisms provide a balanced communication strategy that simultaneously supports reliability, availability, and functional safety.
+
+---
+
+## 6.20 Lessons Learned
+
+The analysis of the operational scenarios demonstrates that functional safety cannot be achieved through a single protective mechanism.
+
+Instead, RaSTA combines several independent safety functions that continuously monitor different aspects of communication.
+
+These include:
+
+- Message integrity verification
+- Sender and receiver identification
+- Sequence number supervision
+- Adaptive timing supervision
+- Heartbeat monitoring
+- Controlled retransmission
+- Deterministic protocol state management
+- Communication redundancy
+
+Each mechanism addresses a different category of communication failure. Collectively they create a layered defence strategy capable of detecting, correcting, or safely containing communication faults before they influence railway signalling applications.
+
+This approach reflects the principles of modern functional safety engineering, where multiple independent safety barriers provide significantly greater confidence than reliance on any individual protection mechanism.
+
+---
+
+## 6.21 Chapter Summary
+
+This chapter evaluated the operational behaviour of the Rail Safe Transport Application protocol using the communication scenarios defined by DIN VDE V 0831-200.
+
+The analysis demonstrated that RaSTA behaves deterministically during successful communication, delayed communication, protocol incompatibilities, retransmission, and communication failures. Throughout every scenario, the protocol continuously verifies communication correctness using sequence supervision, message integrity verification, adaptive timing, heartbeat monitoring, and deterministic state transitions.
+
+When temporary communication disturbances occur, controlled retransmission restores synchronization without exposing incomplete information to the application. When safe recovery is no longer possible, the protocol intentionally terminates communication before outdated or uncertain information can influence railway signalling functions.
+
+The operational evidence presented in this chapter therefore supports the conclusion that RaSTA satisfies the communication safety principles defined by DIN EN 50159 while maintaining the high level of availability required for modern railway signalling systems.
+
+The following chapter develops the overall **Safety Case**, combining the architectural analysis and operational evidence presented throughout this report into a structured engineering argument demonstrating why the protocol can be considered suitable for safety-related railway communication.

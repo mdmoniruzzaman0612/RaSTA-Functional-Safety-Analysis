@@ -2,752 +2,796 @@
 
 ## 5.1 Introduction
 
-The architecture of the Rail Safe Transport Application (RaSTA) protocol has been designed to provide both functional safety and high communication availability for distributed railway signalling systems. Rather than relying on the underlying communication network to provide reliable data transmission, RaSTA incorporates its own protocol mechanisms that continuously supervise message integrity, communication timing, sequence correctness, and connection status.
+The Rail Safe Transport Application (RaSTA) protocol achieves functional safety through a modular architecture that separates communication safety from communication availability. Instead of implementing all protocol functions within a single software component, RaSTA divides its responsibilities into independent protocol layers, each performing a clearly defined task.
 
-A key design objective of the protocol is modularity. Each protocol layer performs a dedicated engineering function while remaining largely independent of the surrounding layers. This separation simplifies implementation, verification, maintenance, and future protocol evolution without affecting interoperability between different RaSTA implementations.
+This architectural separation provides several important engineering advantages. It simplifies implementation, improves maintainability, enables independent verification of protocol components, and allows the protocol to operate over different transport technologies without affecting safety-related behaviour.
 
-Unlike conventional communication protocols, where safety often depends on the reliability of the transport infrastructure, RaSTA assumes that the transport network may introduce communication faults at any time. Safety is therefore implemented entirely within the protocol itself.
+Unlike conventional communication protocols that rely heavily on reliable transport services, RaSTA assumes that the underlying communication network may introduce message corruption, duplication, delays, or packet loss. Consequently, all safety-related verification is performed inside the protocol itself.
 
-This chapter examines the internal architecture of RaSTA, beginning with the Safety and Retransmission Layer before introducing the protocol data unit, message types, connection management, and the Redundancy Layer.
+This chapter examines the internal architecture defined by **DIN VDE V 0831-200**, beginning with the layered protocol structure before analysing protocol messages, connection establishment, state machines, retransmission, and redundancy.
 
 ---
 
-# 5.2 Layered Architecture of RaSTA
+## 5.2 Layered Architecture
 
-The RaSTA protocol is divided into two principal protocol layers defined by DIN VDE V 0831-200:
+The RaSTA protocol is organised into two principal protocol layers:
 
 - Safety and Retransmission Layer
 - Redundancy Layer
 
-These layers operate between the signalling application and the transport network.
+Together these layers provide both communication safety and communication availability.
 
-![RaSTA Protocol Stack](../figures/figure-2-2-protocol-layers-message-frame.png)
+![RaSTA Protocol Layers](../figures/figure-2-2-rasta-protocol-layers.png)
 
 **Figure 5-1. Layered architecture of the RaSTA protocol (adapted from DIN VDE V 0831-200 [1]).**
 
-The application software is responsible only for generating and processing signalling information. It does not implement communication safety itself. Instead, all application messages are forwarded to the Safety and Retransmission Layer.
+The **Application Layer** generates signalling information such as movement authorities, status information, or diagnostic data. It has no knowledge of the communication mechanisms implemented by RaSTA.
 
-The Safety and Retransmission Layer performs the majority of the protocol's safety functions. It is responsible for connection establishment, message integrity verification, sequence supervision, adaptive timing supervision, heartbeat generation, retransmission, and flow control. Every application message passes through this layer before being transmitted over the communication network.
+The **Safety and Retransmission Layer** forms the core of the protocol. Every outgoing application message passes through this layer before transmission. It performs message integrity verification, sequence supervision, adaptive timing supervision, heartbeat generation, retransmission, connection management, and flow control.
 
-Below this layer, the Redundancy Layer increases communication availability. If multiple transport channels are available, identical protocol messages are transmitted simultaneously across each channel. At the receiving side, the redundancy layer combines these physical channels into a single logical communication channel before forwarding the message to the Safety and Retransmission Layer.
+Below the Safety Layer, the **Redundancy Layer** improves communication availability. If multiple transport channels exist, identical protocol messages are transmitted simultaneously through each channel. At the receiving side, the redundancy layer reconstructs a single logical communication channel before forwarding messages to the Safety Layer.
 
-This layered architecture ensures that communication safety and communication availability remain separate engineering concerns while working together to provide a reliable communication service.
+Finally, the **Transport Layer** carries the completed protocol message using technologies such as UDP or TCP over Ethernet.
 
----
-
-# 5.3 Safety and Retransmission Layer
-
-The Safety and Retransmission Layer represents the core of the RaSTA protocol. Nearly all safety-related communication mechanisms are implemented within this layer.
-
-Its primary responsibilities include:
-
-- Establishing communication connections.
-- Supervising connection state.
-- Detecting communication errors.
-- Verifying message integrity.
-- Monitoring message timing.
-- Detecting missing or duplicated messages.
-- Managing retransmissions.
-- Supervising communication buffers.
-- Safely terminating communication when required.
-
-Unlike lower-layer transport protocols, this layer operates with knowledge of railway safety requirements. Every received protocol message is verified before it can influence the application.
-
-An important characteristic of this layer is its deterministic behaviour. For every protocol event, the specification defines exactly one permitted response. This deterministic operation simplifies both protocol verification and railway safety certification.
-
-The Safety and Retransmission Layer therefore provides the principal safety barrier between the signalling application and the communication network.
+This layered organisation ensures that communication safety remains independent of the transport technology while allowing the protocol to operate over different network infrastructures without modification.
 
 ---
 
-# 5.4 Protocol Data Unit
+## 5.3 Responsibilities of the Protocol Layers
 
-Communication between RaSTA instances occurs through Protocol Data Units (PDUs). Every protocol message follows the same general structure, allowing the receiver to process messages consistently regardless of their purpose.
+Each protocol layer performs a dedicated engineering function.
 
-The principal fields contained within a Safety and Retransmission Layer PDU are summarised in Table 5-1.
+| Protocol Layer | Primary Responsibility |
+|---------------|------------------------|
+| Application | Generates and consumes railway signalling information. |
+| Safety and Retransmission Layer | Communication safety, message integrity, timing supervision, retransmission, connection management. |
+| Redundancy Layer | Communication availability through multiple transport channels. |
+| Transport Adaptation | Maps RaSTA messages onto the selected transport protocol. |
+| Transport Layer | Physical transmission of protocol data. |
 
-| Field | Length | Purpose |
-|--------|--------|---------|
-| Message Length | 2 Bytes | Total size of the protocol message. |
-| Message Type | 2 Bytes | Identifies the protocol message. |
-| Receiver ID | 4 Bytes | Identifies the intended receiver. |
-| Sender ID | 4 Bytes | Identifies the transmitting RaSTA instance. |
-| Sequence Number | 4 Bytes | Maintains message order. |
-| Confirmed Sequence Number | 4 Bytes | Acknowledges previously received messages. |
-| Timestamp | 4 Bytes | Records message transmission time. |
-| Confirmed Timestamp | 4 Bytes | Confirms previous communication timing. |
-| User Data | Variable | Contains application or protocol information. |
-| Security Code | 8 or 16 Bytes | Protects message integrity. |
+**Table 5-1. Responsibilities of the RaSTA protocol layers.**
 
-**Table 5-1. General structure of the Safety and Retransmission Layer protocol data unit (adapted from DIN VDE V 0831-200 [1]).**
-
-Each field contributes to one or more communication safety functions. Rather than carrying only application data, every protocol message also contains information required to supervise communication correctness continuously throughout the lifetime of the connection.
-
-For example, the sequence numbers allow detection of missing or duplicated messages, while the timestamps enable adaptive communication supervision. The Security Code protects the complete protocol message against accidental corruption during transmission.
-
-This integrated message structure enables multiple safety mechanisms to operate simultaneously without requiring additional communication overhead.
+Separating these responsibilities simplifies protocol verification because each layer can be analysed independently while preserving the externally observable behaviour defined by the standard.
 
 ---
 
-# 5.5 Protocol Message Types
+## 5.4 Safety and Retransmission Layer
 
-RaSTA defines a small set of specialised protocol messages, each responsible for a particular stage of communication.
+The Safety and Retransmission Layer implements the majority of the protocol mechanisms responsible for functional safety.
 
-| Message | Decimal Value | Purpose |
-|----------|--------------:|---------|
-| Connection Request | 6200 | Requests establishment of a communication connection. |
-| Connection Response | 6201 | Confirms connection establishment. |
-| Retransmission Request | 6212 | Requests retransmission of missing messages. |
-| Retransmission Response | 6213 | Acknowledges a retransmission request. |
-| Disconnect Request | 6216 | Terminates communication safely. |
-| Heartbeat | 6220 | Supervises communication during idle periods. |
-| Data | 6240 | Transfers application information. |
-| Retransmitted Data | 6241 | Transfers previously lost application messages. |
+Its principal responsibilities include:
 
-**Table 5-2. Protocol message types defined by the RaSTA specification.**
+- establishing communication,
+- supervising protocol states,
+- verifying message integrity,
+- monitoring sequence numbers,
+- detecting communication timeouts,
+- generating heartbeat messages,
+- requesting retransmission,
+- performing flow control,
+- terminating unsafe communication.
 
-Although the protocol defines only eight message types, these messages collectively support the complete communication lifecycle, including connection establishment, normal data exchange, communication supervision, recovery from transmission errors, and safe connection termination.
+Unlike ordinary transport protocols, this layer continuously evaluates communication correctness rather than assuming that the transport network provides reliable delivery.
 
-Each message contains the common protocol data unit described previously, while the payload differs according to the function being performed. This design simplifies protocol implementation because every received message follows the same general processing sequence before message-specific behaviour is applied.
+Every received protocol message is verified before being accepted.
 
----
+If verification fails, the protocol either initiates recovery or safely terminates the communication session.
 
-# 5.6 Section Summary
-
-This first part of the System Architecture chapter introduced the layered organisation of the RaSTA protocol and examined the central role of the Safety and Retransmission Layer. The common protocol data unit and the defined message types establish the foundation for all communication performed by the protocol.
-
-The following section examines how these protocol messages are used during connection establishment, including the Connection Request, Connection Response, protocol version negotiation, and the three-step handshake that synchronises both communication partners before application data is exchanged.
-
-# 5.7 Connection Establishment
-
-Before any safety-related application data can be exchanged, both communication partners must establish a synchronized communication session. Unlike conventional client-server protocols, where a connection may be considered established after a single acknowledgement, RaSTA performs a structured handshake to ensure that both communication partners share identical communication parameters before entering normal operation.
-
-The connection establishment procedure synchronizes:
-
-- protocol version,
-- sender and receiver identifiers,
-- initial sequence numbers,
-- receive buffer capacity,
-- communication timing.
-
-Only after successful completion of this procedure does the protocol enter the **Up** state, allowing application messages to be exchanged safely.
+This behaviour represents the primary safety barrier between the railway signalling application and the communication network.
 
 ---
 
-# 5.8 Connection Request
+## 5.5 Protocol Interfaces
 
-The first step of the handshake is the transmission of a **Connection Request (ConnReq)** message.
+Communication between the protocol layers is performed through standardised interfaces defined by DIN VDE V 0831-200.
 
-The Connection Request initializes the communication session by providing all information required by the receiving communication partner to establish a new protocol context.
+![Protocol Stack Interfaces](../figures/figure-2-3-protocol-stack-interfaces.png)
 
-The principal contents of the Connection Request are summarised in Table 5-3.
+**Figure 5-2. Interfaces within the RaSTA protocol stack (adapted from DIN VDE V 0831-200 [1]).**
+
+The specification distinguishes between **compatibility-relevant** and **non-compatibility-relevant** interfaces.
+
+Compatibility-relevant interfaces define externally observable protocol behaviour, including message formats, protocol state transitions, sequence number processing, and communication procedures. Every compliant RaSTA implementation must implement these interfaces exactly as specified to ensure interoperability.
+
+Non-compatibility-relevant interfaces connect the protocol to the application software and the transport adaptation layer. These interfaces may vary between implementations provided that the externally visible protocol behaviour remains unchanged.
+
+This separation enables manufacturers to optimise software architecture while maintaining full compatibility with other RaSTA implementations.
+
+---
+
+## 5.6 Protocol Data Unit
+
+Every message exchanged between two RaSTA instances is encapsulated inside a **Protocol Data Unit (PDU)**.
+
+The protocol data unit contains both application information and protocol control information required for communication supervision.
+
+The general structure is summarised in Table 5-2.
 
 | Field | Purpose |
 |--------|---------|
-| Receiver Identifier | Specifies the destination RaSTA instance. |
-| Sender Identifier | Identifies the transmitting RaSTA instance. |
-| Initial Sequence Number | Random starting point for future sequence numbers. |
-| Confirmed Sequence Number | Initial value (0). |
-| Timestamp | Current transmission time. |
-| Protocol Version | Requested protocol version. |
-| Receive Buffer Size (Nsendmax) | Advertises receiver capacity. |
-| Security Code | Protects message integrity. |
+| Message Length | Total protocol message size |
+| Message Type | Identifies the protocol function |
+| Receiver ID | Identifies the destination |
+| Sender ID | Identifies the source |
+| Sequence Number | Maintains communication order |
+| Confirmed Sequence Number | Acknowledges previously received messages |
+| Timestamp | Supports adaptive timing supervision |
+| Confirmed Timestamp | Confirms previous timing information |
+| User Data | Application payload |
+| Security Code | Protects message integrity |
 
-**Table 5-3. Principal fields of the Connection Request message (adapted from DIN VDE V 0831-200 [1]).**
+**Table 5-2. General structure of the RaSTA Protocol Data Unit (adapted from DIN VDE V 0831-200 [1]).**
 
-A particularly important characteristic of the Connection Request is the use of a **random initial sequence number**.
+Unlike ordinary communication protocols, every protocol message simultaneously performs several communication safety functions.
 
-Rather than beginning every communication session with sequence number zero, the protocol generates a random starting value. This significantly reduces the possibility of replay attacks because protocol messages belonging to previous communication sessions cannot accidentally satisfy the sequence verification rules of a newly established connection.
+The sequence numbers supervise communication order.
 
-The Connection Request therefore performs considerably more than simply requesting communication. It establishes the initial synchronization required for all subsequent protocol processing.
+The timestamps support adaptive timeout calculation.
+
+The sender and receiver identifiers prevent communication with unintended protocol partners.
+
+Finally, the Security Code protects the complete protocol message against accidental modification during transmission.
+
+The protocol therefore combines multiple independent safety mechanisms within every transmitted message without requiring additional supervisory traffic.
 
 ---
 
-# 5.9 Connection Response
+## 5.7 Protocol Message Types
 
-After successfully validating the received Connection Request, the communication partner replies with a **Connection Response (ConnResp)** message.
+RaSTA defines a small number of specialised protocol messages that collectively support the complete communication lifecycle.
 
-The Connection Response confirms that the communication parameters proposed during connection establishment have been accepted.
+| Message | Purpose |
+|----------|---------|
+| Connection Request | Begins communication establishment. |
+| Connection Response | Confirms communication parameters. |
+| Data | Transfers application information. |
+| Heartbeat | Supervises communication during idle periods. |
+| Retransmission Request | Requests missing messages. |
+| Retransmission Response | Confirms retransmission. |
+| Retransmitted Data | Resends previously lost application data. |
+| Disconnect Request | Safely terminates communication. |
 
-Its principal fields are summarised in Table 5-4.
+**Table 5-3. Principal protocol messages defined by RaSTA.**
+
+Although only a limited number of message types exist, they support all protocol operations including connection establishment, communication supervision, error recovery, and safe connection termination.
+
+Every message follows the same protocol data unit structure introduced previously. Consequently, the receiver processes all protocol messages using a common verification procedure before applying message-specific behaviour.
+
+---
+
+## 5.8 Section Summary
+
+This first part introduced the internal architecture of the RaSTA protocol. The layered organisation clearly separates communication safety from communication availability while allowing the protocol to operate independently of the underlying transport technology.
+
+The Safety and Retransmission Layer provides the principal communication safety mechanisms, whereas the Redundancy Layer improves communication availability. Together they form a modular protocol architecture capable of supporting safety-related railway communication.
+
+The following section examines how these protocol messages are used during connection establishment, including the three-stage handshake, protocol version negotiation, and synchronization of communication partners before application data exchange begins.
+
+## 5.9 Connection Establishment
+
+Before any application data can be exchanged, the communication partners must establish a synchronized communication session. This initialization procedure ensures that both sides share identical protocol parameters and communication context before entering normal operation.
+
+Unlike conventional networking protocols, where communication may begin immediately after a simple connection request, RaSTA performs a structured handshake that verifies protocol compatibility, synchronizes sequence numbers, exchanges communication parameters, and establishes timing supervision.
+
+Only after all verification steps have been completed successfully does the protocol permit safety-related application data to be transmitted.
+
+The complete communication procedure is illustrated in Figure 5-3.
+
+![Successful Connection Establishment](../figures/figure-6-1-successful-connection-establishment.png)
+
+**Figure 5-3. Successful connection establishment according to DIN VDE V 0831-200 [1].**
+
+The communication sequence consists of three protocol messages:
+
+1. Connection Request (ConnReq)
+2. Connection Response (ConnResp)
+3. Heartbeat (HB)
+
+Each message contributes to the initialization of the communication context and provides evidence that both communication partners have reached the same protocol state.
+
+---
+
+## 5.10 Connection Request
+
+Communication begins when the client transmits a **Connection Request (ConnReq)**.
+
+This message contains all information required for the receiver to establish a new protocol context.
+
+The principal information exchanged is summarised in Table 5-4.
 
 | Field | Purpose |
 |--------|---------|
-| Receiver Identifier | Destination communication partner. |
-| Sender Identifier | Responding RaSTA instance. |
-| Initial Sequence Number | Random starting sequence number of the responder. |
-| Confirmed Sequence Number | Acknowledges the received Connection Request. |
-| Timestamp | Current transmission time. |
-| Confirmed Timestamp | Confirms previous communication timing. |
-| Protocol Version | Accepted protocol version. |
-| Receive Buffer Size | Receiver capacity of the responder. |
-| Security Code | Integrity protection. |
+| Receiver ID | Identifies the destination RaSTA instance |
+| Sender ID | Identifies the transmitting RaSTA instance |
+| Protocol Version | Indicates the supported protocol version |
+| Initial Sequence Number | Defines the starting point for sequence supervision |
+| Timestamp | Provides the initial timing reference |
+| Receive Buffer Size (Nsendmax) | Advertises receiver capacity |
+| Security Code | Protects the complete protocol message |
 
-**Table 5-4. Principal fields of the Connection Response message (adapted from DIN VDE V 0831-200 [1]).**
+**Table 5-4. Principal contents of the Connection Request message (adapted from DIN VDE V 0831-200 [1]).**
 
-By exchanging Connection Response messages, both communication partners become aware of each other's communication capabilities before application data transmission begins.
+One important design decision is the use of a **random initial sequence number**.
 
-The exchange of receive buffer capacities is particularly important because it enables subsequent flow control during normal communication.
+Rather than beginning every communication session with sequence number zero, RaSTA selects a random starting value for each new connection.
 
----
+This approach significantly reduces the possibility of replay attacks because messages captured during previous communication sessions cannot accidentally satisfy the sequence verification rules of a newly established connection.
 
-# 5.10 Three-Step Handshake
-
-The complete connection establishment procedure consists of three protocol messages.
-
-![Successful Connection Establishment](../figures/figure-5-2-successful-connection-establishment.png)
-
-**Figure 5-2. Successful connection establishment (adapted from DIN VDE V 0831-200 [1]).**
-
-The communication sequence proceeds as follows:
-
-**Step 1 – Connection Request**
-
-The client transmits a Connection Request containing its protocol version, random sequence number, receiver identifier, sender identifier, and receive buffer size.
+The Connection Request therefore performs much more than requesting communication. It establishes the initial communication context upon which all subsequent safety mechanisms depend.
 
 ---
 
-**Step 2 – Connection Response**
+## 5.11 Connection Response
 
-After validating the received request, the server replies with a Connection Response.
+After successfully validating the received Connection Request, the receiver generates a **Connection Response (ConnResp)**.
 
-The response acknowledges the received Connection Request while simultaneously providing the server's own protocol parameters.
+The Connection Response acknowledges the received request while simultaneously transmitting the receiver's own communication parameters.
 
----
+The information exchanged is summarised in Table 5-5.
 
-**Step 3 – Heartbeat**
+| Field | Purpose |
+|--------|---------|
+| Receiver ID | Destination communication partner |
+| Sender ID | Responding RaSTA instance |
+| Protocol Version | Accepted protocol version |
+| Initial Sequence Number | Receiver's random sequence number |
+| Confirmed Sequence Number | Acknowledges the Connection Request |
+| Timestamp | Current communication time |
+| Confirmed Timestamp | Confirms the received timestamp |
+| Receive Buffer Size | Receiver capacity |
+| Security Code | Protects message integrity |
 
-The client completes the synchronization procedure by transmitting a Heartbeat message.
+**Table 5-5. Principal contents of the Connection Response message (adapted from DIN VDE V 0831-200 [1]).**
 
-Only after receiving this message do both communication partners transition into the **Up** state.
+During this stage, both communication partners exchange the parameters required for subsequent communication. In addition to sequence numbers and timing information, the exchange of receive buffer sizes allows the flow control mechanism to operate correctly during normal communication.
 
-At this point, application data may be exchanged.
-
----
-
-Unlike conventional communication protocols, every stage of the handshake contributes directly to communication safety.
-
-The Connection Request initializes communication.
-
-The Connection Response confirms parameter compatibility.
-
-The Heartbeat verifies that both communication partners have entered synchronized protocol states.
-
-Only after successful completion of all three stages is communication considered safe.
+Every field contained within the Connection Response is verified before communication proceeds.
 
 ---
 
-# 5.11 Protocol Version Negotiation
+## 5.12 Completion of the Handshake
 
-During connection establishment, both communication partners exchange their supported protocol versions.
+The final stage of the initialization procedure is the transmission of a **Heartbeat (HB)** message by the client.
 
-This procedure ensures that incompatible protocol implementations do not attempt to communicate.
+Although Heartbeat messages are primarily used during normal operation to supervise communication, the first Heartbeat serves a special purpose during connection establishment.
 
-The version negotiation procedure follows three possible outcomes:
+Its successful reception confirms that:
 
-1. **Identical protocol versions**
+- both communication partners have synchronized sequence numbers;
+- protocol versions are compatible;
+- timing information has been exchanged successfully;
+- communication parameters have been accepted by both sides.
 
-   Communication proceeds immediately.
+Only after this Heartbeat has been received do both protocol instances transition into the **Up** state.
 
-2. **Server supports a newer compatible version**
+At this point the communication channel is considered operational, and application data may be exchanged safely.
 
-   The server determines whether backward compatibility is possible.
-
-3. **Server supports an older protocol version**
-
-   The client decides whether communication using the older version is acceptable.
-
-If compatibility cannot be established, the protocol immediately terminates the connection by transmitting a **Disconnect Request**.
-
-This mechanism prevents communication between incompatible protocol implementations and ensures deterministic protocol behaviour across different software versions.
+This additional confirmation step distinguishes RaSTA from many conventional communication protocols and significantly increases confidence that both communication partners possess an identical communication context before normal operation begins.
 
 ---
 
-# 5.12 Why the Handshake is Important
+## 5.13 Protocol Version Negotiation
 
-The connection establishment procedure performs considerably more than simply opening a communication channel.
+Compatibility between protocol implementations is verified during connection establishment.
 
-It establishes the complete communication context required by the protocol, including:
+Every Connection Request contains the protocol version supported by the initiating communication partner.
 
-- synchronized sequence numbers,
-- protocol compatibility,
-- communication timing,
-- receive buffer sizes,
-- sender and receiver identification.
+The receiver compares this version with its own implementation before accepting the connection.
 
-Without this synchronization, subsequent message verification would be impossible because neither communication partner would possess sufficient information to validate received protocol messages.
+Three situations are possible:
 
-Consequently, the handshake represents the foundation upon which all later safety mechanisms operate.
+- Both communication partners support the same protocol version.
+- One communication partner supports a newer but compatible version.
+- The protocol versions are incompatible.
 
----
+If compatibility cannot be established, communication is terminated immediately.
 
-# 5.13 Functional Safety Contribution
+The protocol never attempts to exchange safety-related information using incompatible implementations because differences in protocol interpretation could lead to unpredictable behaviour.
 
-From a functional safety perspective, the connection establishment procedure provides several independent safety benefits.
-
-First, the exchange of random sequence numbers prevents confusion between previous and newly established communication sessions.
-
-Second, protocol version negotiation prevents incompatible software implementations from exchanging safety-related information.
-
-Third, sender and receiver identifiers ensure that communication occurs only between the intended communication partners.
-
-Finally, the Heartbeat completing the handshake confirms that both communication partners have reached identical protocol states before application data transmission begins.
-
-These mechanisms significantly reduce the probability of unsafe communication immediately after connection establishment and provide the synchronized protocol context required for all subsequent communication.
-
-# 5.14 Protocol State Machine
-
-Once a communication connection has been established, RaSTA controls all protocol behaviour through a deterministic state machine. Every protocol event—whether initiated by the application, generated internally, or received from the communication partner—is processed according to predefined state transition rules.
-
-This deterministic behaviour is essential for railway signalling applications because it guarantees that identical communication events always produce identical protocol responses. Such predictability simplifies verification, validation, interoperability, and functional safety certification.
-
-Unlike many communication protocols that allow implementation-specific behaviour, the RaSTA specification explicitly defines the actions that shall be performed in every communication state.
+Version negotiation therefore represents an additional layer of protection that preserves interoperability while maintaining deterministic communication behaviour.
 
 ---
 
-# 5.15 Communication States
+## 5.14 Functional Safety Contribution
 
-The Safety and Retransmission Layer defines six operational states.
+The connection establishment procedure provides the foundation for all subsequent protocol operation.
 
-![Safety Layer State Machine](../figures/figure-5-3-safety-layer-state-machine.png)
+Rather than simply opening a communication channel, the handshake establishes a synchronized protocol context shared by both communication partners.
 
-**Figure 5-3. State machine of the Safety and Retransmission Layer (adapted from DIN VDE V 0831-200 [1]).**
+From a functional safety perspective, this procedure provides several important benefits:
 
-The communication states are summarised in Table 5-5.
+- Prevents communication with incompatible protocol implementations.
+- Synchronizes sequence numbers before application data exchange.
+- Establishes adaptive timing supervision.
+- Exchanges communication buffer capacities.
+- Prevents replay attacks through random sequence number initialization.
+- Confirms that both protocol instances have reached identical communication states.
+
+Only after every verification step has completed successfully does the protocol permit application messages to influence the railway signalling system.
+
+Consequently, the connection establishment procedure represents the first safety barrier implemented by the RaSTA protocol before normal communication begins.
+
+---
+
+## 5.15 Section Summary
+
+This section analysed the connection establishment procedure defined by DIN VDE V 0831-200. Through the exchange of the Connection Request, Connection Response, and Heartbeat messages, both communication partners establish a synchronized communication context before application data transmission begins.
+
+The handshake performs considerably more than simply opening a communication session. It synchronizes protocol versions, sequence numbers, timing information, communication buffers, and sender identification while simultaneously protecting against replay attacks and incompatible implementations.
+
+The next section examines how this synchronized communication context is maintained throughout the lifetime of the connection using the Safety and Retransmission Layer state machine, heartbeat supervision, and deterministic protocol state transitions.
+
+## 5.16 Safety and Retransmission Layer State Machine
+
+Once the communication handshake has been completed successfully, the Safety and Retransmission Layer controls all subsequent protocol behaviour through a deterministic state machine. Every protocol event—whether initiated by the application, generated internally, or received from the communication partner—is processed according to predefined state transition rules specified in DIN VDE V 0831-200.
+
+Unlike conventional communication protocols that may permit implementation-specific behaviour, RaSTA defines exactly one valid response for every combination of communication state and protocol event. This deterministic behaviour is essential for railway signalling systems because it ensures that independent implementations react identically under identical operating conditions.
+
+The state machine of the Safety and Retransmission Layer is shown in Figure 5-4.
+
+![Safety Layer State Machine](../figures/figure-5-1-safety-layer-state-machine.png)
+
+**Figure 5-4. State machine of the Safety and Retransmission Layer (adapted from DIN VDE V 0831-200 [1]).**
+
+The state machine governs every stage of communication, including connection establishment, normal operation, retransmission, and safe disconnection. By defining explicit transitions between protocol states, the specification eliminates ambiguity and greatly simplifies protocol verification.
+
+---
+
+## 5.17 Communication States
+
+The Safety and Retransmission Layer defines six operational states that together represent the complete lifecycle of a communication session.
 
 | State | Description |
 |--------|-------------|
-| Closed | No communication exists between the two RaSTA instances. |
-| Down | Communication has been requested and initialization is in progress. |
-| Start | The connection establishment handshake is currently being executed. |
-| Up | Normal communication is established. Application messages may be exchanged. |
-| RetrReq | A retransmission request has been issued. |
-| RetrRun | Missing messages are currently being retransmitted. |
+| **Closed** | No communication session exists. |
+| **Down** | Communication initialization is in progress. |
+| **Start** | Connection establishment handshake is being executed. |
+| **Up** | Normal communication is active. |
+| **RetrReq** | Retransmission has been requested. |
+| **RetrRun** | Missing messages are currently being retransmitted. |
 
-**Table 5-5. Communication states of the Safety and Retransmission Layer.**
+**Table 5-6. Communication states of the Safety and Retransmission Layer.**
 
-Each state represents a different stage of the communication lifecycle. Rather than allowing unrestricted message exchange, the protocol carefully controls which protocol messages are permitted within each state.
+Communication always begins in the **Closed** state.
 
-This strict control prevents invalid communication sequences that might otherwise compromise functional safety.
+Following an application request to establish communication, the protocol initializes its internal variables and transitions to the **Down** and **Start** states while the connection establishment handshake is performed.
 
----
+Once synchronization has been completed successfully, both communication partners enter the **Up** state.
 
-# 5.16 State Transitions
+The **Up** state represents normal protocol operation and remains active for the majority of the communication session.
 
-Communication begins in the **Closed** state.
+Whenever sequence supervision detects missing protocol messages, communication temporarily enters the retransmission states (**RetrReq** and **RetrRun**) until synchronization has been restored.
 
-When the application requests communication, the protocol initializes the required communication variables and proceeds to the **Down** state. The client then transmits a Connection Request and enters the **Start** state.
-
-After successful completion of the three-step handshake described previously, both communication partners enter the **Up** state.
-
-The **Up** state represents normal protocol operation. During this state the protocol exchanges:
-
-- Data messages
-- Heartbeat messages
-- Retransmission requests
-- Retransmission responses
-
-Whenever a sequence error is detected, communication temporarily leaves the Up state and enters the retransmission procedure.
-
-If retransmission is requested, the protocol enters the **RetrReq** state.
-
-Once the requested data begins arriving, communication proceeds into **RetrRun**, where retransmitted messages are accepted until synchronization has been restored.
-
-Finally, successful completion of retransmission returns communication to the Up state.
-
-Whenever communication safety can no longer be guaranteed, the protocol immediately transitions back to the Closed state.
+If recovery fails or communication correctness can no longer be guaranteed, the protocol returns immediately to the **Closed** state.
 
 ---
 
-# 5.17 Deterministic Event Processing
+## 5.18 Deterministic State Transitions
 
-A key characteristic of the RaSTA architecture is that every incoming protocol message is processed according to the current communication state.
+One of the defining characteristics of RaSTA is that protocol behaviour depends not only on the received message but also on the current communication state.
 
 For example:
 
-- A Connection Request is accepted only during connection establishment.
-- Application Data is accepted only when communication is already established.
-- Retransmission Responses are processed only while retransmission is active.
-- Messages received during inappropriate states are rejected.
+- A **Connection Request** is accepted only during connection establishment.
+- **Application Data** is processed only while the protocol is in the **Up** state.
+- **Retransmission Responses** are accepted only during retransmission.
+- Messages received in inappropriate states are rejected immediately.
 
-This deterministic processing eliminates protocol ambiguity.
+This state-dependent processing prevents invalid protocol sequences from influencing the signalling application.
 
-Consequently, two independent RaSTA implementations following the specification will always react identically to identical communication events.
+Because every state transition is explicitly defined by the standard, different manufacturers implementing RaSTA will always process identical protocol events in the same manner.
 
-This deterministic behaviour is particularly important for safety certification because protocol behaviour becomes predictable and fully verifiable.
-
----
-
-# 5.18 Heartbeat Supervision
-
-Once communication has entered the **Up** state, RaSTA continuously supervises the availability of both communication partners.
-
-When application traffic is present, ordinary data messages provide sufficient evidence that communication remains operational.
-
-During idle periods, however, no application messages may be available.
-
-To prevent undetected communication failures, the protocol periodically generates **Heartbeat (HB)** messages.
-
-Heartbeat messages contain the complete protocol control information required for communication supervision but do not contain application payload.
-
-The transmission interval is controlled by the configurable heartbeat timer **Th**.
-
-Whenever any protocol message is transmitted, the timer is restarted.
-
-If no further protocol message is generated before **Th** expires, the protocol automatically transmits a Heartbeat message.
-
-This mechanism guarantees continuous communication supervision regardless of application traffic.
+This deterministic behaviour is particularly important for interoperability and safety certification, where predictable protocol behaviour is mandatory.
 
 ---
 
-# 5.19 Connection Monitoring
+## 5.19 Heartbeat Supervision
 
-Heartbeat messages support continuous connection monitoring throughout the lifetime of the communication session.
+During periods of normal communication, application messages naturally confirm that both communication partners remain operational.
 
-The receiving communication partner maintains a supervision timer **Ti**.
+However, signalling systems frequently experience periods during which no application data needs to be exchanged.
 
-Whenever a valid Data, Retransmitted Data, or Heartbeat message containing a newer confirmed timestamp is received, this timer is restarted.
+Without additional supervision, communication failures occurring during these idle periods could remain undetected.
 
-If **Ti** expires before another valid communication message arrives, the protocol concludes that communication has failed.
+To prevent this situation, RaSTA periodically transmits **Heartbeat (HB)** messages whenever the configurable heartbeat interval (**Th**) expires without application traffic.
 
-Rather than continuing operation under uncertain communication conditions, the protocol immediately issues a Disconnect Request and returns to the Closed state.
+Heartbeat messages do not contain application data. Instead, they carry the protocol control information required to continue communication supervision, including sequence numbers, timestamps, and message integrity protection.
 
-This behaviour reflects the fail-safe philosophy of railway communication systems.
+Every valid Heartbeat received by the communication partner confirms that:
 
----
+- communication remains operational;
+- sequence synchronization is maintained;
+- timing supervision remains valid;
+- both protocol instances continue operating correctly.
 
-# 5.20 Benefits of the State Machine
-
-The state machine provides several important engineering advantages.
-
-First, communication behaviour remains deterministic throughout every stage of operation.
-
-Second, invalid protocol sequences are detected immediately because every protocol message is evaluated within the context of the current communication state.
-
-Third, retransmission is fully integrated into normal communication without requiring separate protocol logic.
-
-Finally, safe termination of communication is guaranteed whenever protocol correctness can no longer be verified.
-
-Instead of attempting to continue communication under uncertain conditions, the protocol intentionally disconnects, ensuring that potentially unsafe information never reaches the application layer.
+Heartbeat messages therefore extend communication supervision throughout the entire lifetime of the connection, regardless of application traffic.
 
 ---
 
-# 5.21 Functional Safety Contribution
+## 5.20 Adaptive Communication Monitoring
 
-The protocol state machine forms the behavioural foundation of the Safety and Retransmission Layer.
+Heartbeat messages work together with the adaptive timing mechanism introduced earlier in the report.
 
-Rather than allowing arbitrary communication sequences, the state machine defines precisely how every communication event shall be processed.
+Rather than using fixed timeout values, RaSTA continuously measures communication behaviour and adjusts its supervision timers according to observed network performance.
 
-This deterministic behaviour contributes directly to functional safety by ensuring that:
+The protocol evaluates several timing parameters, including:
 
-- communication begins only after successful synchronization;
-- application data is exchanged only while communication remains valid;
-- retransmission occurs only under controlled conditions;
-- invalid protocol events are rejected;
-- communication terminates safely whenever correctness cannot be guaranteed.
+- transmission delay,
+- processing delay,
+- heartbeat interval,
+- message age,
+- communication drift.
 
-Together with the protocol data unit structure discussed previously, the state machine provides the operational framework upon which all remaining RaSTA safety mechanisms are built.
+This adaptive supervision enables the protocol to distinguish between temporary communication fluctuations and genuine communication failures.
 
-# 5.22 Sequence Number Supervision
+Consequently, unnecessary protocol disconnects are avoided while genuine communication faults are detected rapidly.
 
-After a communication connection has been successfully established, RaSTA continuously verifies that every message is received exactly once and in the correct order. This supervision is achieved using **Sequence Numbers (SN)**, which are attached to every protocol data unit generated by the Safety and Retransmission Layer.
+Compared with conventional fixed-time supervision, this adaptive approach provides greater robustness when operating over modern packet-switched communication networks.
 
-Each transmitted message receives a unique sequence number that is incremented after every successful transmission. The receiver maintains its own expected sequence number and compares it with the sequence number contained in every received protocol data unit.
+---
 
-If the received sequence number matches the expected value, the message is accepted for further processing. Otherwise, the protocol assumes that communication has been disturbed and initiates the retransmission procedure.
+## 5.21 Functional Safety Contribution
 
-This mechanism enables the protocol to detect:
+The state machine and heartbeat supervision mechanisms provide the behavioural framework upon which the remaining RaSTA safety functions operate.
 
-- Lost messages
-- Duplicate messages
-- Replay attacks
-- Messages arriving out of sequence
+From a functional safety perspective they provide several important benefits:
+
+- deterministic communication behaviour;
+- continuous supervision during both active and idle communication;
+- prevention of invalid protocol sequences;
+- rapid detection of communication interruptions;
+- predictable recovery following communication faults;
+- safe transition to predefined protocol states.
+
+Together these mechanisms ensure that communication remains continuously supervised throughout the lifetime of every connection.
+
+Whenever communication correctness can no longer be demonstrated, the protocol intentionally leaves the operational state and transitions into a predefined safe condition.
+
+This deterministic fail-safe behaviour represents one of the fundamental design principles of the RaSTA protocol.
+
+---
+
+## 5.22 Section Summary
+
+This section examined the behavioural architecture of the Safety and Retransmission Layer. The protocol state machine defines every permitted communication state and explicitly specifies how protocol events shall be processed throughout the communication lifecycle.
+
+Heartbeat supervision and adaptive timing complement the state machine by continuously monitoring communication availability, ensuring that failures are detected even during periods without application traffic.
+
+These mechanisms establish the behavioural foundation upon which the remaining communication safety functions—sequence supervision, retransmission, flow control, and redundancy—operate.
+
+## 5.23 Sequence Number Supervision
+
+After communication has entered the **Up** state, every transmitted protocol message receives a unique **Sequence Number (SN)**. These sequence numbers enable the receiving communication partner to verify that messages are received exactly once and in the correct order.
+
+Unlike conventional communication protocols that primarily use sequence numbers to improve reliability, RaSTA employs sequence supervision as a fundamental safety mechanism. Every received message is compared against the next expected sequence number before it is accepted by the application.
+
+If the received sequence number matches the expected value, the message is processed normally. If a sequence discontinuity is detected, the protocol immediately concludes that communication has been disturbed and initiates the retransmission procedure.
+
+Sequence supervision enables the protocol to detect several communication faults simultaneously, including:
+
+- Message loss
+- Message duplication
+- Message replay
+- Message resequencing
 - Unexpected message insertion
 
-Unlike conventional transport protocols that primarily aim to guarantee reliable delivery, RaSTA performs sequence supervision as a functional safety mechanism. The objective is not simply to recover missing information, but to ensure that no unsafe communication reaches the signalling application.
+By verifying every transmitted message, RaSTA ensures that only a complete and correctly ordered communication stream reaches the railway signalling application.
 
 ---
 
-# 5.23 Confirmed Sequence Numbers
+## 5.24 Confirmed Sequence Numbers
 
-In addition to ordinary sequence numbers, RaSTA maintains **Confirmed Sequence Numbers (CS)**.
+In addition to ordinary sequence numbers, every protocol message also contains a **Confirmed Sequence Number (CS)**.
 
-While the Sequence Number identifies the current protocol message, the Confirmed Sequence Number acknowledges previously received messages.
+Rather than transmitting dedicated acknowledgement packets, RaSTA acknowledges previously received messages by embedding the confirmed sequence number inside subsequent outgoing messages.
 
-Three internal variables are used:
+Three internal variables are maintained:
 
-| Variable | Purpose |
-|-----------|---------|
-| **CST** | Sequence number acknowledged in the next transmitted message. |
-| **CSR** | Most recently confirmed sequence number received from the communication partner. |
-| **CSPDU** | Confirmed sequence number contained within the received protocol message. |
+| Variable | Description |
+|----------|-------------|
+| **CST** | Confirmed sequence number transmitted to the communication partner |
+| **CSR** | Most recent confirmed sequence number received |
+| **CSPDU** | Confirmed sequence number contained within the received protocol message |
 
-**Table 5-6. Confirmed sequence number variables used by RaSTA.**
+**Table 5-7. Confirmed sequence number variables used by the Safety and Retransmission Layer.**
 
-Whenever a valid message is received, the receiver stores its sequence number and later includes this value in the next outgoing message. This implicit acknowledgement eliminates the need for dedicated acknowledgement packets and reduces protocol overhead.
+Whenever a valid message is received, its sequence number is stored internally and later returned to the sender as part of the next outgoing protocol message.
 
-The sender continuously evaluates received acknowledgements. Once a transmitted message has been confirmed, it is removed from the retransmission buffer, ensuring that only outstanding messages remain available for possible recovery.
+This acknowledgement mechanism enables the sender to determine exactly which messages have already been received successfully and which messages remain buffered for possible retransmission.
 
----
-
-# 5.24 Flow Control
-
-Reliable communication also requires that neither communication partner transmits messages faster than the other can process them.
-
-For this purpose, RaSTA implements a flow control mechanism based on the configuration parameter **Nsendmax**.
-
-During connection establishment, both communication partners exchange the maximum number of outstanding messages they are able to buffer.
-
-The sender then monitors the number of transmitted but unacknowledged messages.
-
-If this number reaches the receiver's advertised limit, additional transmissions are temporarily delayed until acknowledgements become available.
-
-This mechanism prevents receiver buffer overflow while allowing communication to continue efficiently under normal operating conditions.
-
-Unlike many conventional flow control algorithms that focus primarily on network efficiency, RaSTA uses flow control to preserve deterministic protocol behaviour and prevent communication failures caused by excessive message generation.
+The use of implicit acknowledgements reduces protocol overhead while maintaining deterministic communication behaviour.
 
 ---
 
-# 5.25 Packetization
+## 5.25 Flow Control
 
-Applications frequently generate multiple small messages within a short period of time.
+Reliable communication requires that neither communication partner transmits messages faster than the other can process them.
 
-Sending every application message individually would increase protocol overhead and reduce communication efficiency.
+RaSTA addresses this problem through a deterministic flow control mechanism based on the configuration parameter **Nsendmax**.
 
-To address this issue, RaSTA supports **packetization**, allowing several application messages to be combined into a single protocol data unit.
+During connection establishment, both communication partners exchange their receive buffer capacities.
+
+The sender continuously monitors the number of transmitted but unacknowledged protocol messages.
+
+If this number reaches the receiver's advertised buffer capacity, further transmissions are temporarily suspended until acknowledgements become available.
+
+Unlike conventional congestion control algorithms that adapt to network conditions, RaSTA flow control focuses on maintaining deterministic communication behaviour and preventing receiver buffer overflow.
+
+Consequently, communication performance remains predictable even when the processing capabilities of both communication partners differ significantly.
+
+---
+
+## 5.26 Packetization
+
+Many railway applications generate numerous small messages within short time intervals.
+
+Sending each message individually would increase communication overhead and reduce transmission efficiency.
+
+To improve bandwidth utilisation, RaSTA supports **packetization**, allowing multiple application messages to be combined into a single protocol data unit.
 
 Each application message is preceded by its own length field, enabling the receiver to reconstruct the original message boundaries after reception.
 
-The maximum number of application messages that may be combined into a single protocol message is determined by the configuration parameter **NmaxPackage**.
+The maximum number of application messages that may be combined is defined by the configuration parameter **NmaxPackage**.
 
-Although packetization improves communication efficiency, it remains completely transparent to the application software. After reception, the Safety and Retransmission Layer separates the individual application messages before forwarding them to the signalling application.
+Although packetization improves communication efficiency, it remains completely transparent to the signalling application.
 
-Consequently, packetization improves bandwidth utilisation without changing application behaviour.
+After reception, the Safety and Retransmission Layer separates the individual application messages before forwarding them to the application software.
 
----
-
-# 5.26 Retransmission Mechanism
-
-Despite highly reliable communication networks, occasional packet loss remains possible.
-
-Rather than immediately terminating communication after detecting a missing message, RaSTA first attempts to recover the missing information using its retransmission mechanism.
-
-The retransmission procedure begins when the receiver detects an unexpected sequence number.
-
-Instead of forwarding the message to the application, the protocol temporarily suspends normal communication and sends a **Retransmission Request (RetrReq)** to the communication partner.
-
-The request identifies the last correctly received sequence number, allowing the sender to determine exactly which messages must be retransmitted.
-
-The sender then performs the following operations:
-
-1. Searches the retransmission buffer.
-2. Sends a Retransmission Response.
-3. Retransmits all missing application messages.
-4. Completes retransmission using either a Heartbeat or a normal Data message.
-
-Throughout this process, application data remains protected from incomplete communication because messages are released only after the correct sequence has been restored.
+This design improves communication efficiency without affecting application behaviour or protocol safety.
 
 ---
 
-# 5.27 Retransmission States
+## 5.27 Retransmission Mechanism
 
-The retransmission mechanism introduces two dedicated communication states into the Safety and Retransmission Layer.
+Despite the high reliability of modern railway communication networks, temporary packet loss cannot be completely eliminated.
+
+Rather than immediately terminating communication whenever a message is lost, RaSTA attempts controlled recovery using its retransmission mechanism.
+
+The retransmission procedure begins whenever the receiver detects a discontinuity in the sequence numbers.
+
+Instead of forwarding incomplete information to the application, the receiver performs the following sequence:
+
+1. Detect the missing sequence number.
+2. Suspend application data delivery.
+3. Generate a **Retransmission Request (RetrReq)**.
+4. Wait for the sender's response.
+5. Receive the missing application messages.
+6. Restore sequence synchronization.
+7. Resume normal communication.
+
+Only after the missing messages have been received successfully does the protocol release the buffered application data.
+
+This procedure guarantees that the application never observes incomplete communication.
+
+---
+
+## 5.28 Retransmission States
+
+Retransmission introduces two dedicated protocol states.
 
 | State | Description |
 |--------|-------------|
-| **RetrReq** | Waiting for retransmission response after detecting a sequence error. |
-| **RetrRun** | Retransmitted messages are currently being received and processed. |
+| **RetrReq** | Waiting for retransmission after detecting a missing message. |
+| **RetrRun** | Processing retransmitted messages while restoring synchronization. |
 
-**Table 5-7. Retransmission states of the Safety and Retransmission Layer.**
+**Table 5-8. Retransmission states of the Safety and Retransmission Layer.**
 
-These states temporarily suspend ordinary application communication while protocol synchronization is restored.
+These states temporarily interrupt normal application communication while protocol consistency is restored.
 
-Once all missing messages have been received successfully, communication automatically returns to the normal **Up** state.
+If retransmission completes successfully, communication returns automatically to the **Up** state.
 
-If synchronization cannot be restored before the adaptive supervision timer expires, the protocol safely terminates the communication session.
+If retransmission cannot be completed before the adaptive supervision timer expires, communication is terminated safely.
 
-This behaviour demonstrates the balance between communication availability and functional safety that characterises the RaSTA protocol.
+This behaviour demonstrates one of the fundamental design principles of RaSTA:
+
+> **Attempt recovery whenever communication can still be restored safely. Otherwise, terminate communication before unsafe information reaches the signalling application.**
 
 ---
 
-# 5.28 Engineering Perspective
+## 5.29 Functional Safety Contribution
 
-From an engineering viewpoint, sequence supervision, acknowledgements, flow control, and retransmission represent complementary mechanisms rather than independent protocol functions.
+The mechanisms presented in this section operate together to preserve communication consistency throughout the complete communication session.
 
-Sequence supervision detects communication faults.
+Sequence supervision detects communication disturbances.
 
 Confirmed sequence numbers acknowledge successful reception.
 
 Flow control prevents communication overload.
 
-Retransmission restores missing information.
+Packetization improves transmission efficiency.
 
-Together these mechanisms maintain communication consistency throughout the entire communication session while ensuring that incomplete or inconsistent information is never delivered to the application.
+Retransmission restores temporarily lost information while preventing incomplete communication from reaching the application.
 
-Instead of assuming perfect communication, RaSTA continuously validates every stage of message exchange and performs corrective actions whenever communication integrity is threatened.
+Collectively, these mechanisms provide an additional layer of protection that complements the state machine and heartbeat supervision analysed previously.
 
-This layered approach significantly improves both communication reliability and functional safety compared with conventional transport protocols that rely primarily on the underlying network infrastructure.
+Instead of assuming perfect communication, RaSTA continuously validates every transmitted message and performs corrective actions whenever inconsistencies are detected.
 
-# 5.29 Redundancy Layer
+This layered verification strategy significantly improves both communication reliability and functional safety.
 
-While the Safety and Retransmission Layer ensures communication correctness, the **Redundancy Layer** is responsible for improving communication availability.
+## 5.30 Redundancy Layer
 
-Safety and availability are closely related but represent different engineering objectives. Safety ensures that incorrect information is never accepted, whereas availability ensures that correct information continues to be delivered even when communication faults occur.
+The Safety and Retransmission Layer guarantees communication correctness. However, communication correctness alone is not sufficient for railway signalling systems. High operational availability is equally important because unnecessary communication interruptions may reduce railway capacity and system performance.
 
-To improve availability, RaSTA allows a single logical communication channel to be implemented using multiple independent physical transport channels.
+For this reason, RaSTA introduces a dedicated **Redundancy Layer** whose objective is to improve communication availability without affecting the safety mechanisms implemented by the upper protocol layer.
 
-Instead of relying on one communication path, identical protocol messages are transmitted simultaneously across every configured transport channel.
+Unlike the Safety and Retransmission Layer, the Redundancy Layer does not verify application data or communication integrity. Instead, it provides a reliable transport service by managing multiple independent communication channels and presenting them as a single logical channel to the upper protocol layer.
 
-If one transport channel becomes delayed, corrupted, or unavailable, another transport channel can still successfully deliver the message.
-
-This design significantly improves communication availability without changing the behaviour observed by the Safety and Retransmission Layer.
+This clear separation of responsibilities allows safety and availability to be addressed independently while maintaining a modular protocol architecture.
 
 ---
 
-# 5.30 Redundancy Channel Model
+## 5.31 Channel Model
 
-The operation of the Redundancy Layer is illustrated by the channel model defined in the DIN specification.
+The redundancy concept implemented by RaSTA is illustrated by the channel model shown below.
 
-![Redundancy Channel Model](../figures/figure-6-1-redundancy-channel-model.png)
+![Redundancy Channel Model](../figures/figure-5-2-redundancy-channel-model.png)
 
-**Figure 5-4. Channel model of the Redundancy Layer (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 5-5. Channel model of the Redundancy Layer (adapted from DIN VDE V 0831-200 [1]).**
 
-As shown in Figure 5-4, a single logical redundancy channel is formed from one or more independent transport channels.
+Instead of transmitting messages over only one physical communication channel, the Redundancy Layer simultaneously forwards identical protocol messages through every configured transport channel.
 
-During transmission, every outgoing protocol message is duplicated and transmitted simultaneously across all configured transport channels.
+Examples include:
 
-At the receiving side, the Redundancy Layer compares the received messages and forwards only one valid copy to the Safety and Retransmission Layer.
+- Ethernet Channel A
+- Ethernet Channel B
+- Optical Fibre
+- Wireless Communication
 
-Duplicate messages arriving from slower transport channels are discarded after diagnostic evaluation.
+At the receiving side, duplicate protocol messages are recognised using redundancy sequence numbers.
 
-Consequently, the upper protocol layers remain completely unaware that multiple transport channels are being used.
+The first correctly received message is immediately forwarded to the Safety and Retransmission Layer.
 
-This abstraction greatly simplifies protocol implementation because all higher protocol layers operate exactly as if only one communication channel existed.
+Additional copies arriving later are discarded after diagnostic evaluation.
 
----
-
-# 5.31 Sequence Supervision in the Redundancy Layer
-
-Unlike the Safety and Retransmission Layer, which supervises application-level communication, the Redundancy Layer maintains its own sequence numbers for every redundancy channel.
-
-Each transmitted redundancy message receives an incrementing sequence number.
-
-The receiver compares the received sequence number with the next expected value.
-
-Three situations are possible:
-
-- **Expected sequence number received**  
-  The message is immediately forwarded to the Safety and Retransmission Layer.
-
-- **Future sequence number received**  
-  The message is temporarily stored inside the **Defer Queue** while the protocol waits for the missing message.
-
-- **Old or duplicate sequence number received**  
-  The message is discarded because it has already been processed previously.
-
-This mechanism ensures that temporary differences in transport channel latency do not unnecessarily trigger retransmission procedures within the upper protocol layers.
+Consequently, the upper protocol layers remain completely independent of the physical communication infrastructure.
 
 ---
 
-# 5.32 Defer Queue
+## 5.32 Event-State Matrix
 
-One of the key mechanisms implemented by the Redundancy Layer is the **Defer Queue**.
+The behaviour of the Redundancy Layer is formally defined by an event-state matrix.
 
-The Defer Queue temporarily stores messages that arrive earlier than expected.
+![Redundancy Event-State Matrix](../figures/figure-5-3-redundancy-event-state-matrix.png)
 
-For example, consider two transport channels:
+**Figure 5-6. Event-state matrix of the Redundancy Layer (adapted from DIN VDE V 0831-200 [1]).**
 
-- Transport Channel A
-- Transport Channel B
+The matrix specifies how every incoming protocol event shall be processed depending on the current communication state.
 
-If message **101** is delayed on Channel A but message **102** arrives first through Channel B, the receiver cannot immediately forward message 102 because message 101 has not yet been delivered.
+Unlike the Safety and Retransmission Layer, which manages several operational states, the Redundancy Layer performs only a limited number of state transitions.
 
-Instead, message 102 is placed inside the Defer Queue.
+Nevertheless, every event is still processed deterministically.
 
-The protocol then waits for a configurable period **Tseq**.
-
-If message 101 arrives before this timer expires:
-
-- message 101 is forwarded first,
-- followed immediately by message 102.
-
-The original message order is therefore preserved.
-
-If the timer expires before message 101 arrives, the queued message is released to the Safety and Retransmission Layer.
-
-This mechanism prevents unnecessary communication delays while preserving the correct ordering of messages whenever possible.
+This deterministic processing guarantees that different RaSTA implementations will react identically under identical communication conditions.
 
 ---
 
-# 5.33 Redundancy State Machine
+## 5.33 Redundancy State Machine
 
-Compared with the Safety and Retransmission Layer, the Redundancy Layer uses a much simpler state machine.
+The operational behaviour of the Redundancy Layer is illustrated by its state machine.
 
-![Redundancy Layer State Machine](../figures/figure-6-2-redundancy-state-machine.png)
+![Redundancy State Machine](../figures/figure-5-4-redundancy-state-machine.png)
 
-**Figure 5-5. State transitions of the Redundancy Layer (adapted from DIN VDE V 0831-200 [1]).**
+**Figure 5-7. State transitions of the Redundancy Layer (adapted from DIN VDE V 0831-200 [1]).**
 
-Only two communication states are defined.
+Only two operational states are defined.
 
 | State | Description |
-|---------|-------------|
+|--------|-------------|
 | **Closed** | No redundancy channel exists. |
-| **Up** | The redundancy channel is operational. |
+| **Up** | Redundancy communication is active. |
 
-**Table 5-8. Communication states of the Redundancy Layer.**
+**Table 5-9. Operational states of the Redundancy Layer.**
 
-When the upper protocol layer requests communication, the Redundancy Layer initializes all internal variables and enters the **Up** state.
+The simplicity of the redundancy state machine reflects the specialised purpose of this protocol layer.
 
-When communication is terminated, all queues, timers, and sequence numbers are released before returning to the **Closed** state.
-
-The simplicity of this state machine reflects the fact that the Redundancy Layer is responsible only for transport availability rather than communication safety.
+Rather than supervising communication correctness, the Redundancy Layer concentrates exclusively on providing highly available communication services for the Safety and Retransmission Layer.
 
 ---
 
-# 5.34 Principal Redundancy Functions
+## 5.34 Principal Redundancy Functions
 
-DIN VDE V 0831-200 defines several internal functions that implement the behaviour of the Redundancy Layer.
+The behaviour of the Redundancy Layer is implemented through several internal functions defined by DIN VDE V 0831-200.
 
-The most important functions are summarised in Table 5-9.
+These functions are presented in the following figures.
 
-| Function | Purpose |
-|----------|---------|
-| **f_init()** | Initializes a new redundancy channel. |
-| **f_cleanup()** | Releases all redundancy resources. |
-| **f_receiveData()** | Verifies and processes received transport messages. |
-| **f_sendData()** | Sends identical messages through every transport channel. |
-| **f_deferTmo()** | Processes messages remaining inside the Defer Queue after timeout. |
-| **f_deliverDeferQueue()** | Delivers queued messages in the correct sequence. |
+### Initialization
 
-**Table 5-9. Principal functions implemented by the Redundancy Layer.**
+![Function f_init()](../figures/figure-5-5-redundancy-function-f-init.png)
 
-Although these functions operate internally, together they implement the complete redundancy behaviour defined by the specification.
+**Figure 5-8. Function `f_init()` (adapted from DIN VDE V 0831-200 [1]).**
 
-Their responsibilities remain clearly separated from those of the Safety and Retransmission Layer, preserving the modular architecture of the protocol.
+The `f_init()` function creates a new redundancy context, initializes sequence numbers, clears internal queues, configures timers, and prepares the communication channels before data transmission begins.
 
 ---
 
-# 5.35 Contribution to Functional Safety
+### Cleanup
 
-The Redundancy Layer contributes primarily to **communication availability** rather than communication integrity.
+![Function f_cleanup()](../figures/figure-5-6-redundancy-function-f-cleanup.png)
 
-Integrity protection remains the responsibility of the Safety and Retransmission Layer.
+**Figure 5-9. Function `f_cleanup()` (adapted from DIN VDE V 0831-200 [1]).**
 
-Nevertheless, redundancy indirectly improves functional safety because uninterrupted communication reduces the probability that signalling applications lose communication with remote safety devices.
-
-By masking temporary failures affecting individual transport channels, the Redundancy Layer allows communication to continue without triggering unnecessary protocol disconnects.
-
-At the same time, delayed or duplicate transport messages are carefully supervised before they are forwarded to higher protocol layers, ensuring that increased availability does not compromise communication correctness.
-
-The clear separation between availability mechanisms and safety mechanisms represents one of the strongest architectural characteristics of the RaSTA protocol.
+When communication terminates, the `f_cleanup()` function releases all allocated protocol resources, resets timers, clears buffered messages, and returns the redundancy layer to the Closed state.
 
 ---
 
-# 5.36 Chapter Summary
+### Receiving Data
 
-This chapter examined the internal architecture of the Rail Safe Transport Application protocol. The layered organisation of the protocol separates communication safety from communication availability, allowing each protocol layer to perform a dedicated engineering function.
+![Function f_receiveData()](../figures/figure-5-7-redundancy-function-f-receive-data.png)
 
-The chapter introduced the Safety and Retransmission Layer, the protocol data unit structure, protocol message types, connection establishment procedure, state machine, heartbeat supervision, sequence monitoring, confirmed sequence numbers, flow control, packetization, retransmission, and finally the Redundancy Layer.
+**Figure 5-10. Function `f_receiveData()` (adapted from DIN VDE V 0831-200 [1]).**
 
-Together, these architectural elements form a deterministic communication framework capable of detecting, correcting, and supervising communication faults before they influence railway signalling applications. Every protocol component contributes to the layered defence strategy required for safety-related railway communication.
+The `f_receiveData()` function validates incoming redundancy messages, verifies redundancy sequence numbers, detects duplicates, and determines whether received messages should be forwarded immediately or temporarily stored inside the Defer Queue.
 
-Having established the protocol architecture, the following chapter evaluates the **dynamic behaviour** of RaSTA by analysing the operational scenarios defined in DIN VDE V 0831-200. These scenarios demonstrate how the protocol behaves during normal communication, retransmission, communication failures, and recovery procedures, providing practical evidence of the protocol's correct functional operation.
+This function forms the principal decision point of the Redundancy Layer.
+
+---
+
+### Sending Data
+
+![Function f_sendData()](../figures/figure-5-8-redundancy-function-f-send-data.png)
+
+**Figure 5-11. Function `f_sendData()` (adapted from DIN VDE V 0831-200 [1]).**
+
+The `f_sendData()` function duplicates every outgoing protocol message and transmits identical copies through every configured transport channel.
+
+By distributing messages across independent communication paths, the protocol significantly increases communication availability without modifying the behaviour of the Safety Layer.
+
+---
+
+### Defer Queue Timeout
+
+![Function f_deferTmo()](../figures/figure-5-9-redundancy-function-f-defer-tmo.png)
+
+**Figure 5-12. Function `f_deferTmo()` (adapted from DIN VDE V 0831-200 [1]).**
+
+Messages arriving earlier than expected are stored temporarily inside the Defer Queue.
+
+The `f_deferTmo()` function supervises the associated timeout (**Tseq**).
+
+If the missing message does not arrive before the timeout expires, the queued message is released to the upper protocol layer according to the redundancy rules defined by the specification.
+
+---
+
+### Delivering Deferred Messages
+
+![Function f_deliverDeferQueue()](../figures/figure-5-10-redundancy-function-f-deliver-defer-queue.png)
+
+**Figure 5-13. Function `f_deliverDeferQueue()` (adapted from DIN VDE V 0831-200 [1]).**
+
+Whenever the expected message arrives successfully, the `f_deliverDeferQueue()` function removes the stored messages from the Defer Queue and forwards them to the Safety and Retransmission Layer in the correct order.
+
+This mechanism allows the Redundancy Layer to compensate for temporary differences in transport channel latency while preserving deterministic message sequencing.
+
+---
+
+## 5.35 Contribution of the Redundancy Layer to Functional Safety
+
+Although the Redundancy Layer primarily improves communication availability, it also contributes indirectly to functional safety.
+
+Multiple communication channels reduce the probability that a single transport failure interrupts communication.
+
+The Defer Queue preserves correct message ordering despite differences in transport latency.
+
+Duplicate detection prevents multiple copies of the same message from reaching the Safety Layer.
+
+Most importantly, the Redundancy Layer performs these functions transparently.
+
+The Safety and Retransmission Layer continues operating exactly as if only one communication channel existed.
+
+This separation allows both protocol layers to remain relatively simple while collectively providing both communication safety and high availability.
+
+---
+
+## 5.36 Chapter Summary
+
+This chapter examined the complete architecture of the Rail Safe Transport Application protocol.
+
+The analysis began with the layered organisation of the protocol before examining the Safety and Retransmission Layer, protocol data units, connection establishment, deterministic state management, heartbeat supervision, sequence verification, retransmission, and finally the Redundancy Layer.
+
+The architecture demonstrates one of the strongest characteristics of RaSTA: the separation of communication safety from communication availability.
+
+The Safety and Retransmission Layer ensures that only correct information reaches the railway signalling application, while the Redundancy Layer increases communication robustness by managing multiple transport channels transparently.
+
+Together these layers provide a modular, deterministic, and highly dependable communication architecture that satisfies the functional safety objectives required for modern railway signalling systems.
+
+The following chapter analyses the operational scenarios defined by DIN VDE V 0831-200 to demonstrate that these architectural mechanisms operate correctly during both normal and fault conditions.
