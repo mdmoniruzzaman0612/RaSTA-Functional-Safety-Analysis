@@ -1,325 +1,188 @@
-# 4. Mission-Critical Functionality
+# 4. Mission Critical Functionality
 
 ## 4.1 Introduction
 
-RaSTA (Rail Safe Transport Application) is a safety-related communication protocol designed for railway signalling systems. Its primary objective is to provide secure and highly available communication between distributed signalling components while satisfying the requirements of DIN EN 50159 [1][2].
+The primary purpose of the Rail Safe Transport Application (RaSTA) protocol is to provide safe and highly available communication for railway signalling systems. Unlike conventional communication protocols, RaSTA assumes that communication channels are not inherently reliable and therefore continuously verifies every transmitted message before it is accepted by the receiving application.
 
-Unlike conventional communication protocols, RaSTA incorporates multiple independent safety mechanisms that continuously monitor communication correctness, timeliness, and availability. These mechanisms ensure that communication faults are either corrected or detected before they can influence the behaviour of a safety-related application.
+The protocol achieves this objective through a collection of independent safety mechanisms operating together throughout the lifetime of every communication connection. These mechanisms detect communication faults, initiate recovery procedures where possible, and transition to a safe state whenever communication integrity can no longer be guaranteed.
 
-The mission-critical functions of RaSTA are:
-
-1. Safe connection establishment
-2. Message integrity protection
-3. Sequence integrity supervision
-4. Timeliness supervision
-5. Connection monitoring
-6. Retransmission of lost messages
-7. Communication redundancy
-8. Safe connection termination
+This section introduces the mission-critical functions implemented by RaSTA and explains their contribution to railway functional safety.
 
 ---
 
-## 4.2 Hazard Classification
+## 4.2 Protocol Interfaces
 
-Communication failures in railway signalling systems may lead to incorrect control decisions, loss of train protection information, or delayed execution of safety functions.
+The communication architecture of RaSTA is organised around clearly defined interfaces between the application layer, the protocol stack, and the transport layer.
 
-The qualitative risk assessment used in this report is illustrated in Figure 4-1.
+![RaSTA Protocol Interfaces](../figures/figure-3-2-rasta-protocol-interfaces.png)
 
-![Risk Matrix](../figures/figure-4-1-risk-matrix.png)
+**Figure 4-1.** Interfaces within the RaSTA protocol stack (adapted from DIN VDE V 0831-200 [1]).
 
-**Figure 4-1:** Qualitative risk matrix used for hazard classification.
+As shown in Figure 4-1, the protocol separates application-specific behaviour from communication safety. The application layer exchanges user data with the Safety and Retransmission Layer, while the transport adaptation exchanges protocol data units with the underlying transport network.
 
-Communication-related hazards considered in this report include:
-
-| Hazard ID | Description                       |
-| --------- | --------------------------------- |
-| H-1       | Corrupted message accepted        |
-| H-2       | Delayed message accepted          |
-| H-3       | Lost message undetected           |
-| H-4       | Repeated message accepted         |
-| H-5       | Unauthorized sender accepted      |
-| H-6       | Message sequence error undetected |
-| H-7       | Complete communication failure    |
-
-**Table 4-1:** Communication hazards addressed by RaSTA.
+This separation allows different railway applications to use the same communication protocol without modifying the safety mechanisms.
 
 ---
 
-## 4.3 Safe Connection Establishment
+## 4.3 Mission-Critical Safety Functions
 
-Before application data can be exchanged, RaSTA establishes a connection using a controlled handshake procedure.
+RaSTA implements several independent safety functions that operate continuously during communication.
 
-The connection establishment sequence is:
+The principal safety functions are:
 
-```text
-Client                          Server
+| Function                       | Purpose                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| Connection Establishment       | Safely initializes communication between two RaSTA instances            |
+| Message Integrity Verification | Detects message corruption using an MD4 safety code                     |
+| Sequence Supervision           | Detects missing, repeated, or out-of-order messages                     |
+| Timeliness Monitoring          | Detects messages that arrive too late                                   |
+| Heartbeat Supervision          | Confirms continued availability of communication partners               |
+| Retransmission                 | Recovers messages lost during transmission                              |
+| Redundancy                     | Improves communication availability through multiple transport channels |
+| Safe Disconnection             | Terminates unsafe communication                                         |
 
-ConnReq ----------------------->
+**Table 4-1.** Mission-critical protocol functions.
 
-                     <---------- ConnResp
-
-HB ---------------------------->
-
-Connection State = Up
-```
-
-**Figure 4-2:** Connection establishment sequence.
-
-The protocol automatically assigns roles:
-
-* Lower identifier → Client
-* Higher identifier → Server
-
-During connection establishment the following parameters are exchanged:
-
-* Protocol version
-* Sender identifier
-* Receiver identifier
-* Initial sequence number
-* Receive buffer size (Nsendmax)
-* Timestamp information
-
-A connection becomes operational only after successful completion of all three steps [1].
+Each function contributes independently to the overall communication safety argument.
 
 ---
 
-## 4.4 Message Integrity Protection
+## 4.4 Adaptive Channel Monitoring
 
-One of the primary safety functions of RaSTA is the detection of message corruption.
+One of the most important safety mechanisms implemented by RaSTA is adaptive channel monitoring.
 
-Every Safety and Retransmission Layer message contains a safety code.
+![Adaptive Channel Monitoring](../figures/figure-4-1-adaptive-channel-monitoring.png)
 
-The standard defines three options:
+**Figure 4-2.** Adaptive channel monitoring process (adapted from DIN VDE V 0831-200 [1]).
 
-| Option | Safety Code       |
-| ------ | ----------------- |
-| 1      | No safety code    |
-| 2      | Lower half of MD4 |
-| 3      | Full MD4          |
+Rather than relying on fixed communication timeouts, RaSTA continuously measures the communication behaviour between the two protocol instances.
 
-**Table 4-2:** Safety code options defined by RaSTA.
+The protocol evaluates:
 
-The safety code is calculated using the protocol data unit contents and verified upon reception.
+* Round-trip delay (**Trtd**)
+* Connection supervision delay (**Talive**)
+* Maximum acceptable message age (**Tmax**)
 
-The mechanism protects against:
-
-* Data corruption
-* Unauthorized modification
-* Invalid message insertion
-
-If verification fails, the message is discarded immediately [1][9].
-
----
-
-## 4.5 Example RaSTA Telegram
-
-The RaSTA standard provides the following message structure for heartbeat messages.
-
-| Field                     | Example Value           |
-| ------------------------- | ----------------------- |
-| Message Length            | 36                      |
-| Message Type              | 6220 (Heartbeat)        |
-| Receiver ID               | 987654                  |
-| Sender ID                 | 123456                  |
-| Sequence Number           | 100                     |
-| Confirmed Sequence Number | 99                      |
-| Timestamp                 | 34567                   |
-| Confirmed Timestamp       | 34450                   |
-| Safety Code               | 93 9F 1C 86 59 CF F5 03 |
-
-**Table 4-3:** Example heartbeat telegram derived from the RaSTA protocol format.
-
-Before acceptance, the receiver verifies:
-
-1. Safety code
-2. Sender identifier
-3. Receiver identifier
-4. Sequence number
-5. Confirmed sequence number
-6. Timestamp information
-
-Only messages passing all checks are delivered to the application layer.
-
----
-
-## 4.6 Sequence Integrity Supervision
-
-RaSTA uses sequence numbers to ensure ordered communication.
-
-Each message contains:
-
-* Sequence Number (SN)
-* Confirmed Sequence Number (CS)
-
-The receiver continuously compares the received sequence number against the expected value.
-
-Example:
-
-```text
-Expected SN = 25
-Received SN = 26
-```
-
-Result:
-
-```text
-Sequence Error Detected
-```
-
-Sequence supervision protects against:
-
-* Message repetition
-* Replay
-* Message loss
-* Message insertion
-* Message resequencing
-
-These threats are explicitly identified in DIN EN 50159 [2].
-
----
-
-## 4.7 Timeliness Supervision
-
-Correct information can become unsafe if it is delivered too late.
-
-RaSTA continuously supervises message timeliness using:
-
-* Timestamp (TS)
-* Confirmed Timestamp (CTS)
-* Round-trip delay (Trtd)
-* Connection supervision delay (Talive)
-
-The supervision timeout is calculated as:
+Using these values, the receiver dynamically calculates the supervision timeout:
 
 ```text
 Ti = Trtd + Talive + Tmax
 ```
 
-where:
+Whenever a valid protocol message containing a newer Confirmed Timestamp (CTS) is received, the supervision timer is restarted.
 
-* Ti = supervision timeout
-* Tmax = maximum acceptable message age
+If no valid message is received before the timer expires, the connection is considered unsafe and is terminated.
 
-If Ti expires, the connection is considered unsafe and is terminated [1].
-
-This mechanism provides protection against the delay threat defined by DIN EN 50159 [2].
+This adaptive mechanism allows RaSTA to tolerate normal communication delays while still detecting abnormal behaviour.
 
 ---
 
-## 4.8 Heartbeat Supervision
+## 4.5 Message Integrity Protection
 
-Heartbeat messages maintain connection supervision when no application data is available.
+Every protocol message contains a safety code generated using the MD4 message digest algorithm.
 
-Message Type:
+The safety code is calculated over the protocol data unit before transmission.
 
-```text
-6220 (Heartbeat)
-```
+Upon reception, the receiver recalculates the safety code and compares it with the transmitted value.
 
-Heartbeat messages are transmitted after the configured interval:
+If the values differ:
 
-```text
-Th
-```
+* the message is discarded,
+* an error counter is incremented,
+* the application never receives the corrupted information.
 
-Their functions include:
-
-* Monitoring remote availability
-* Updating timing measurements
-* Maintaining protocol synchronization
-* Preventing unnecessary connection termination
-
-Heartbeat messages therefore act as both a liveness check and a timing reference [1].
+This mechanism protects against accidental communication corruption.
 
 ---
 
-## 4.9 Retransmission of Lost Messages
+## 4.6 Sequence Number Supervision
 
-Lost messages are detected through sequence-number supervision.
+RaSTA assigns a sequence number to every transmitted protocol data unit.
 
-Example:
+The receiver continuously compares the received sequence number with the expected value.
 
-```text
-Expected SN = 25
-Received SN = 26
-```
+This mechanism detects:
 
-The receiver initiates a retransmission procedure:
+* Message loss
+* Message repetition
+* Message insertion
+* Message replay
+* Incorrect message ordering
 
-```text
-RetrReq
-      →
-RetrResp
-      →
-RetrData
-```
-
-The sender retransmits all unacknowledged messages beginning with the missing sequence number.
-
-This mechanism increases communication availability while preserving message ordering [1].
+If the received sequence number is not the expected value, the protocol initiates the retransmission procedure.
 
 ---
 
-## 4.10 Communication Redundancy
+## 4.7 Heartbeat Supervision
 
-The Redundancy Layer provides protection against transport-channel failures.
+Communication may remain idle for extended periods when no application data needs to be exchanged.
 
-A redundancy channel may consist of multiple transport channels:
+To ensure that communication partners remain operational during these periods, RaSTA periodically transmits heartbeat messages.
 
-```text
-Transport Channel A
-Transport Channel B
-Transport Channel C
-```
+Heartbeat messages provide three important functions:
 
-The same message is transmitted on all channels using:
+* Connection supervision
+* Availability monitoring
+* Timeliness verification
 
-* Identical payload
-* Identical sequence number
-* Identical CRC value
+The heartbeat interval is determined by the configurable parameter **Th**.
 
-Failure of a single transport channel therefore does not necessarily interrupt communication [1].
+Whenever ordinary data messages are transmitted, they also satisfy the heartbeat requirement.
 
 ---
 
-## 4.11 Safe Failure Behaviour
+## 4.8 Retransmission Mechanism
 
-When communication validity can no longer be guaranteed, RaSTA transitions to a safe state.
+Sequence supervision allows the receiver to detect missing protocol messages.
 
-Typical causes include:
+Instead of immediately terminating communication, RaSTA attempts to recover the missing information.
 
-* Timeout expiration
-* Invalid protocol version
-* Sequence-number violation
-* Retransmission failure
-* Invalid protocol flow
+The recovery procedure consists of:
 
-The protocol transmits:
+1. Detecting the missing sequence number.
+2. Sending a Retransmission Request (RetrReq).
+3. Receiving a Retransmission Response (RetrResp).
+4. Receiving the missing Retransmitted Data (RetrData).
+5. Returning to normal communication.
 
-```text
-DiscReq
-```
-
-and enters the Closed state.
-
-This ensures that unsafe communication is never forwarded to the application [1].
+Only user-data messages are retransmitted. Connection-management messages are never retransmitted.
 
 ---
 
-## 4.12 Summary
+## 4.9 Redundancy Mechanism
 
-RaSTA implements multiple independent safety mechanisms that collectively provide safe communication for railway signalling systems.
+Communication availability is increased through the Redundancy Layer.
 
-| Safety Objective   | RaSTA Mechanism     |
-| ------------------ | ------------------- |
-| Integrity          | MD4 Safety Code     |
-| Authenticity       | Sender/Receiver IDs |
-| Sequence Integrity | SN and CS           |
-| Timeliness         | TS, CTS, Ti         |
-| Availability       | Redundancy Layer    |
-| Recovery           | Retransmission      |
-| Safe Failure       | DiscReq             |
+The same protocol message is transmitted simultaneously over one or more independent transport channels.
 
-**Table 4-4:** Mapping of safety objectives to protocol mechanisms.
+The receiver compares incoming copies, removes duplicates, restores the correct sequence, and forwards only a single verified message to the Safety and Retransmission Layer.
 
-These mechanisms form the foundation for compliance with DIN EN 50159 and support the safe operation of railway signalling applications.
+As a result, communication may continue successfully even when one physical transport channel experiences failures.
+
+---
+
+## 4.10 Safe Failure Behaviour
+
+A fundamental principle of functional safety is that uncertain communication shall never be accepted.
+
+Whenever RaSTA detects a condition that cannot be safely corrected, including:
+
+* Invalid safety code,
+* Timeout expiration,
+* Retransmission failure,
+* Protocol version mismatch,
+* Sequence number violations,
+
+the protocol generates a Disconnect Request (DiscReq) and transitions to the **Closed** state.
+
+This fail-safe behaviour ensures that unsafe communication never reaches the application.
+
+---
+
+## 4.11 Section Summary
+
+The mission-critical functions described in this section form the foundation of RaSTA's functional safety architecture.
+
+Rather than relying on a single protection mechanism, the protocol combines integrity verification, sequence supervision, adaptive timing, heartbeat monitoring, retransmission, redundancy, and deterministic failure handling.
+
+Together, these mechanisms provide the communication safety required by modern railway signalling systems and establish the basis for the detailed protocol architecture examined in the following section.
