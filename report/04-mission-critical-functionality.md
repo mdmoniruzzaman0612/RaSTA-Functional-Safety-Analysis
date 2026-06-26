@@ -40,7 +40,7 @@ Rather than acting independently, these mechanisms operate together to create mu
 
 The protocol separates the application software from the communication mechanisms through clearly defined interfaces.
 
-![Protocol Interfaces](../figures/figure-2-3-protocol-interfaces.png)
+![Protocol Interfaces](../figures/figure-2-3-protocol-stack-interfaces.png)
 
 **Figure 4-1. Interfaces within the RaSTA protocol stack (adapted from DIN VDE V 0831-200 [1]).**
 
