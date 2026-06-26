@@ -1,116 +1,152 @@
-# 2. Overview
+# 2. System Overview
 
-## 2.1 Background
+## 2.1 Introduction
 
-Safety-related railway signalling systems depend on reliable communication between distributed electronic and programmable electronic subsystems. If communication failures are not detected and controlled, incorrect or outdated information may influence signalling functions and create hazardous operating conditions.
+The Rail Safe Transport Application (RaSTA) is a standardized communication protocol developed for safety-related railway signalling applications. It provides secure and highly available communication between distributed railway systems while remaining independent of the application layer. The protocol is specified in **DIN VDE V 0831-200** and is designed to satisfy the communication safety requirements defined by **DIN EN 50159**.
 
-RaSTA, the Rail Safe Transport Application, is specified in DIN VDE V 0831-200 as a generic protocol stack for secure and highly available communication in railway signalling systems [1]. The protocol provides mechanisms for safe data transmission in accordance with DIN EN 50159 and supports operation over networks of category 1 and category 2 [1].
-
-The protocol is intentionally independent of the application layer. This means that RaSTA does not define railway application logic itself. Instead, it provides a safety-related communication service that can be used by different railway signalling applications [1].
+Unlike conventional communication protocols, RaSTA assumes that the underlying transport network cannot guarantee safe communication. Instead, the protocol itself implements mechanisms for integrity verification, sequence supervision, timeliness monitoring, retransmission, and redundancy. These mechanisms enable RaSTA to operate safely over standard transport technologies such as UDP and TCP.
 
 ---
 
-## 2.2 Purpose of RaSTA
+## 2.2 Position of RaSTA within Railway Communication Systems
 
-The purpose of RaSTA is to provide:
+The RaSTA specification defines the scope of the protocol and its relationship to the surrounding communication architecture.
 
-* Safe communication according to DIN EN 50159
-* High availability through redundant transport channels
-* Retransmission of lost or corrupted messages
-* Timeliness monitoring of application messages
-* Connection supervision using heartbeat messages
-* Diagnostic information for communication monitoring
+![Classification and Scope of RaSTA](../figures/figure-2-1-rasta-scope-and-classification.png)
 
-The protocol does not prescribe a concrete software implementation. Instead, it specifies protocol data units, message formats, state transitions, and abstract protocol functions that must be implemented for compatibility [1].
+**Figure 2-1.** Classification and scope of the RaSTA protocol (adapted from DIN VDE V 0831-200 [1]).
 
----
+As illustrated in Figure 2-1, RaSTA is positioned between the application layer and the underlying transport services. The protocol focuses exclusively on providing safe and highly available communication and deliberately does not define any application-specific behaviour.
 
-## 2.3 Protocol Stack
+The application layer is therefore free to implement signalling logic, train control algorithms, or interlocking functions independently of the communication protocol. Similarly, the transport layer may consist of conventional Commercial Off-The-Shelf (COTS) technologies such as UDP or TCP without requiring safety-specific modifications.
 
-RaSTA consists of two main protocol layers:
-
-1. **Safety and Retransmission Layer**
-2. **Redundancy Layer**
-
-The Safety and Retransmission Layer provides the safety-related communication mechanisms. These include sequence supervision, confirmed sequence numbers, timestamp-based timeliness monitoring, security code verification, connection establishment, heartbeat supervision, and retransmission of lost data [1].
-
-The Redundancy Layer improves availability by transmitting the same information over one or more transport channels. If one transport channel loses or corrupts a message, the redundant channel may still provide a valid copy of the same message [1].
-
-The underlying transport layer may use standard communication services such as UDP or TCP. A connectionless transport service is sufficient because RaSTA performs its own connection supervision [1].
+This separation allows the same RaSTA implementation to be reused across multiple railway applications while maintaining compliance with railway communication standards.
 
 ---
 
-## 2.4 Scope and Limitations
+## 2.3 Objectives of the RaSTA Protocol
 
-RaSTA is intended for safety-related electrical, electronic, and programmable electronic systems used in railway signalling applications [1].
+The principal objective of RaSTA is to ensure that only valid and timely information reaches the receiving application.
 
-The scope includes:
+To achieve this objective, the protocol implements mechanisms that detect:
 
-* Message formats
-* Protocol data units
-* State transitions
+* Message corruption
+* Message loss
+* Message duplication
+* Incorrect message ordering
+* Excessive communication delay
+* Unauthorized communication
+* Communication channel failures
+
+Whenever one of these conditions cannot be resolved safely, the protocol terminates the communication connection rather than allowing potentially unsafe information to propagate to the application.
+
+This behaviour follows the fail-safe philosophy required by railway signalling systems.
+
+---
+
+## 2.4 Layered Protocol Architecture
+
+RaSTA adopts a modular layered architecture in which each protocol layer has clearly defined responsibilities.
+
+![RaSTA Protocol Stack](../figures/figure-3-1-rasta-protocol-stack.png)
+
+**Figure 2-2.** RaSTA layered protocol architecture and message frames (adapted from DIN VDE V 0831-200 [1]).
+
+The protocol stack consists of four logical layers:
+
+### Application Layer
+
+The application layer contains the railway-specific control logic. RaSTA does not specify its implementation and treats application data as payload.
+
+Typical applications include:
+
+* Electronic interlockings
+* Train control systems
+* Trackside equipment
+* On-board signalling systems
+
+### Safety and Retransmission Layer
+
+This layer provides the core safety functionality of RaSTA.
+
+Its primary responsibilities include:
+
 * Connection establishment
-* Retransmission handling
-* Redundancy handling
-* Timing supervision
-* Diagnostic functions
+* Message integrity verification
+* Sequence supervision
+* Adaptive timeliness monitoring
+* Heartbeat generation
+* Flow control
+* Retransmission of lost messages
+* Safe connection termination
 
-The scope does not include:
+All communication safety decisions are performed within this layer.
 
-* Application-layer behaviour
-* Specific railway application protocols
-* Concrete software interfaces
-* Concrete transport-layer APIs
-* Cybersecurity protection against unauthorized access in open networks
+### Redundancy Layer
 
-The RaSTA standard explicitly states that communication over open networks vulnerable to unauthorized access is not considered. If such threats are relevant, additional security measures must be implemented separately [1].
+The Redundancy Layer improves communication availability by transmitting identical protocol messages over one or more independent transport channels.
 
----
+It performs:
 
-## 2.5 Interfaces
+* Duplicate elimination
+* Sequence supervision
+* Temporary buffering of out-of-order messages
+* CRC verification
+* Transport channel diagnostics
 
-RaSTA provides an interface to the application layer and an interface to the transport layer.
+This layer enables continued communication even when individual transport channels experience failures.
 
-The application interface includes services such as:
+### Transport Layer
 
-* OpenConnection()
-* CloseConnection()
-* SendData()
-* ReceiveData()
-* ConnectionStateRequest()
+The transport layer provides conventional network communication services.
 
-It also provides notifications for received messages, connection state changes, and diagnostic information [1].
+RaSTA supports several transport technologies including:
 
-The transport interface provides a transparent communication service for sending and receiving protocol data units. It maps RaSTA messages to transport addresses such as IP addresses, port numbers, and protocol types [1].
+* UDP
+* TCP
+* Other equivalent transport services
 
----
-
-## 2.6 RaSTA Network
-
-A RaSTA network is defined by two conditions:
-
-1. The involved RaSTA instances can communicate at transport-layer level.
-2. The instances use a common safety code at the Safety and Retransmission Layer [1].
-
-Sender and receiver identifiers are unique only within a specific RaSTA network. Therefore, the RaSTA network identifier and the initial value used for the MD4 safety-code calculation must have a unique mapping [1].
-
-This concept allows one physical communication infrastructure to be divided into separate RaSTA networks by using different safety-code initial values.
+Unlike traditional communication systems, RaSTA does not rely on the transport layer to provide communication safety. Instead, the protocol independently verifies all received messages.
 
 ---
 
-## 2.7 Relevance to Functional Safety
+## 2.5 Communication Philosophy
 
-RaSTA is relevant to functional safety because it implements mechanisms that detect and control communication failures before they can influence safety-related railway applications.
+RaSTA follows the principle that communication safety shall be independent of the reliability of the underlying network.
 
-The main safety-relevant mechanisms are:
+Rather than assuming reliable message delivery, the protocol continuously verifies:
 
-* Security code verification
-* Sender and receiver identification
-* Sequence number supervision
-* Confirmed sequence number supervision
-* Timestamp and confirmed timestamp monitoring
-* Heartbeat-based connection supervision
-* Retransmission of lost data
-* Safe disconnection when communication validity cannot be guaranteed
+* Message authenticity
+* Message integrity
+* Sequence correctness
+* Communication timing
+* Connection availability
 
-These mechanisms form the technical basis for the functional safety analysis developed in the following sections.
+Every received protocol data unit undergoes multiple verification steps before being accepted by the receiving application.
+
+If any verification step fails, the protocol either initiates corrective actions, such as retransmission, or transitions to a predefined safe state by disconnecting the communication partner.
+
+This philosophy allows RaSTA to operate safely over communication infrastructures that are not themselves safety-certified.
+
+---
+
+## 2.6 Relationship to Railway Functional Safety Standards
+
+RaSTA was developed specifically to support the railway functional safety framework defined by European railway standards.
+
+The protocol contributes to compliance with:
+
+* **DIN EN 50159** by protecting against communication threats such as corruption, repetition, deletion, delay, insertion, masquerade, and resequencing.
+* **DIN EN 50126** by supporting dependable railway communication throughout the system lifecycle.
+* **DIN EN 50128** by providing a standardized communication interface for safety-related software.
+* **DIN EN 50129** by supplying communication mechanisms suitable for safety-related signalling systems.
+
+The protocol therefore represents a key component within the communication infrastructure of modern railway signalling systems.
+
+---
+
+## 2.7 Section Summary
+
+RaSTA provides a standardized communication protocol specifically designed for safety-related railway applications. Through its layered architecture and independent communication safety mechanisms, the protocol enables secure and highly available communication over conventional transport networks.
+
+The following sections examine each protocol layer in greater detail, beginning with the functional requirements that define the behaviour of the communication system.
