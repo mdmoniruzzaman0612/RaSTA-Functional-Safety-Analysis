@@ -2,208 +2,187 @@
 
 ## 3.1 Introduction
 
-This section defines the functional, safety, availability, timing, diagnostic, and configuration requirements for a RaSTA-based communication system. The requirements are derived from the RaSTA protocol specification, DIN VDE V 0831-200 Version 03.03, and from the safety communication objectives of DIN EN 50159 [1].
+The behaviour of the Rail Safe Transport Application (RaSTA) is defined by the requirements specified in **DIN VDE V 0831-200**. Rather than prescribing a particular implementation, the standard specifies the communication behaviour, message formats, protocol states, and safety mechanisms that every compatible implementation shall follow.
 
-The purpose of these requirements is to establish a traceable basis for the subsequent hazard analysis, architecture analysis, verification activities, and safety case.
+The primary objective of these requirements is to ensure that safety-related railway communication remains correct, timely, and available even when the underlying transport network cannot guarantee reliable communication.
+
+The requirements presented in this section form the basis for the protocol architecture analysed in the subsequent chapters.
 
 ---
 
 ## 3.2 Functional Requirements
 
-### FR-1 Safe Communication Service
+The RaSTA protocol shall provide the following core communication services.
 
-The system shall provide a safe communication service for railway signalling applications using the RaSTA protocol stack [1].
+| ID    | Functional Requirement                                                             |
+| ----- | ---------------------------------------------------------------------------------- |
+| FR-1  | Establish a safe communication connection between two RaSTA instances.             |
+| FR-2  | Securely transmit application messages.                                            |
+| FR-3  | Receive and validate protocol messages.                                            |
+| FR-4  | Detect corrupted messages before delivery to the application.                      |
+| FR-5  | Detect missing or duplicated messages.                                             |
+| FR-6  | Support retransmission of lost messages.                                           |
+| FR-7  | Continuously supervise communication timing.                                       |
+| FR-8  | Generate heartbeat messages during communication inactivity.                       |
+| FR-9  | Maintain communication availability using redundant transport channels.            |
+| FR-10 | Safely terminate communication whenever protocol correctness cannot be guaranteed. |
 
-### FR-2 Application Independence
-
-The communication protocol shall be independent of the specific railway application protocol [1].
-
-### FR-3 Connection Establishment
-
-The system shall provide a connection establishment mechanism using Connection Request, Connection Response, and Heartbeat messages [1].
-
-### FR-4 Data Transmission
-
-The system shall support transmission of application messages using RaSTA Data messages [1].
-
-### FR-5 Retransmission
-
-The system shall support retransmission of lost or corrupted user data using Retransmission Request, Retransmission Response, and Retransmitted Data messages [1].
-
-### FR-6 Heartbeat Supervision
-
-The system shall send Heartbeat messages when no data has been transmitted within the configured heartbeat interval (T_h) [1].
-
-### FR-7 Redundant Transmission
-
-The Redundancy Layer shall transmit each message identically over all available transport channels [1].
-
-### FR-8 Transport Independence
-
-The protocol shall support operation over standard transport services such as UDP or TCP [1].
+**Table 3-1.** Primary functional requirements derived from DIN VDE V 0831-200.
 
 ---
 
 ## 3.3 Safety Requirements
 
-### SR-1 Message Integrity Verification
+The protocol is designed to satisfy the communication safety principles defined by **DIN EN 50159**.
 
-The receiver shall verify the safety code of each received Safety and Retransmission Layer message before further processing [1].
+Accordingly, RaSTA shall detect the following communication threats before information reaches the receiving application.
 
-### SR-2 Sender and Receiver Validation
+| ID   | Safety Requirement                                                | Implemented Mechanism              |
+| ---- | ----------------------------------------------------------------- | ---------------------------------- |
+| SR-1 | Detect message corruption                                         | MD4 Safety Code                    |
+| SR-2 | Detect message repetition                                         | Sequence Numbers                   |
+| SR-3 | Detect message deletion                                           | Retransmission Procedure           |
+| SR-4 | Detect excessive delay                                            | Adaptive Time Monitoring           |
+| SR-5 | Detect incorrect message ordering                                 | Sequence Supervision               |
+| SR-6 | Detect unauthorized communication                                 | Sender and Receiver Identification |
+| SR-7 | Enter a safe state if communication validity cannot be guaranteed | Disconnect Procedure               |
 
-The receiver shall verify that the sender and receiver identifiers match the expected RaSTA connection [1].
+**Table 3-2.** Functional safety requirements.
 
-### SR-3 Message Type Validation
-
-The receiver shall reject undefined message types [1].
-
-### SR-4 Sequence Number Supervision
-
-The receiver shall verify the sequence number of received messages to detect repetition, replay, omission, loss, insertion, and resequencing [1].
-
-### SR-5 Confirmed Sequence Number Supervision
-
-The receiver shall verify the confirmed sequence number to ensure that acknowledgements are plausible [1].
-
-### SR-6 Timeliness Monitoring
-
-The receiver shall verify timeliness of time-monitoring-relevant messages using timestamp and confirmed timestamp information [1].
-
-### SR-7 Connection Failure Detection
-
-The receiver shall terminate the connection when the adaptive monitoring timer (T_i) expires [1].
-
-### SR-8 Safe Disconnection
-
-If the protocol detects an unrecoverable error, the connection shall be closed using a Disconnect Request message with an appropriate reason code [1].
+These requirements directly address the communication threats identified in DIN EN 50159.
 
 ---
 
 ## 3.4 Availability Requirements
 
-### AR-1 Redundancy Channel
+Unlike many communication protocols, RaSTA is required to provide both communication safety and high availability.
 
-The system shall support a redundancy channel consisting of one or more transport channels [1].
+The protocol therefore implements a dedicated Redundancy Layer whose responsibilities include:
 
-### AR-2 Multi-Channel Transmission
+* Simultaneous transmission over multiple transport channels.
+* Duplicate suppression.
+* Message reordering.
+* CRC verification.
+* Transport-channel diagnostics.
 
-The sender shall transmit each redundancy-layer message on all available transport channels [1].
-
-### AR-3 Duplicate Handling
-
-The redundancy-layer receiver shall detect duplicate messages received from multiple transport channels [1].
-
-### AR-4 Out-of-Sequence Buffering
-
-The redundancy-layer receiver shall temporarily store out-of-sequence messages in a DeferQueue [1].
-
-### AR-5 Deferred Delivery
-
-Messages stored in the DeferQueue shall be delivered when missing earlier messages arrive or when the configured timeout (T_{seq}) expires [1].
+The use of redundant transport channels allows communication to continue even if one transport channel becomes unavailable.
 
 ---
 
-## 3.5 Timing Requirements
+## 3.5 Communication Requirements
 
-### TR-1 Maximum Message Age
+The specification defines several communication services that every RaSTA implementation shall support.
 
-The maximum acceptable age of a message shall be defined by the configuration parameter (T_{max}) [1].
+These include:
 
-### TR-2 Heartbeat Interval
+* Opening a communication connection.
+* Closing a communication connection.
+* Sending application data.
+* Receiving application data.
+* Querying connection status.
+* Receiving protocol notifications.
+* Receiving diagnostic information.
 
-Heartbeat messages shall be sent when no message has been sent within the configured interval (T_h) [1].
-
-### TR-3 Adaptive Monitoring Timer
-
-The adaptive monitoring timer (T_i) shall be recalculated after reception of a time-monitoring-relevant message [1].
-
-### TR-4 Timing Constraint for Retransmission
-
-The timing parameters shall satisfy the following relationship [1]:
-
-```text
-Tmax > 3 × Th + 2 × (TA + TB) + Tseq
-```
-
-where:
-
-* (T_{max}) = maximum acceptable message age
-* (T_h) = heartbeat interval
-* (T_A) = transmission time from A to B
-* (T_B) = transmission time from B to A
-* (T_{seq}) = redundancy-layer defer time
+The corresponding protocol services are realised through the Safety and Retransmission Layer.
 
 ---
 
-## 3.6 Diagnostic Requirements
+## 3.6 Protocol Compatibility Requirements
 
-### DR-1 Error Counters
+One important design objective of RaSTA is interoperability.
 
-The system shall maintain diagnostic error counters for:
+For this reason, the standard distinguishes between:
 
-* Incorrect safety code
-* Invalid sender or receiver identifier
-* Undefined message type
-* Implausible sequence number
-* Implausible confirmed sequence number [1]
+### Compatibility-Relevant Requirements
 
-### DR-2 Channel Quality Monitoring
+These requirements shall be implemented exactly as specified.
 
-The system shall support diagnostic monitoring of channel quality using (T_{rtd}) and (T_{alive}) values [1].
+They include:
 
-### DR-3 Transport Channel Diagnostics
+* Protocol message formats.
+* Protocol state transitions.
+* Message processing rules.
+* Sequence-number handling.
+* Timing supervision.
+* Connection establishment procedures.
 
-The Redundancy Layer shall provide diagnostic information for each transport channel using values such as (N_{missed}), (T_{drift}), and (T_{drift2}) [1].
+Failure to implement these requirements would prevent interoperability between independent RaSTA implementations.
 
----
+### Non-Compatibility-Relevant Requirements
 
-## 3.7 Configuration Requirements
+These requirements describe recommended implementation behaviour.
 
-The system configuration shall include the following Safety and Retransmission Layer parameters:
+Typical examples include:
 
-| Parameter        | Meaning                                                           |
-| ---------------- | ----------------------------------------------------------------- |
-| (T_{max})        | Maximum acceptable age of a message                               |
-| (T_h)            | Heartbeat interval                                                |
-| Security Code    | None, lower half of MD4, or full MD4                              |
-| MWA              | Maximum number of received unacknowledged messages                |
-| (N_{sendmax})    | Receive buffer capacity exchanged during connection establishment |
-| (N_{maxPackage}) | Maximum packetization factor                                      |
-| (N_{diagWindow}) | Diagnostic measurement window                                     |
+* Application programming interfaces.
+* Diagnostic interfaces.
+* Transport adaptation interfaces.
 
-**Table 3-1:** Safety and Retransmission Layer configuration parameters [1].
-
-The Redundancy Layer configuration shall include:
-
-| Parameter                   | Meaning                                     |
-| --------------------------- | ------------------------------------------- |
-| Number of Physical Channels | Number of transport paths used              |
-| Verification Code           | None, CRC32, CRC32C, CRC16                  |
-| (T_{seq})                   | Time for buffering out-of-sequence messages |
-| (N_{diagnosis})             | Diagnostic measurement window               |
-| (N_{deferQueueSize})        | Maximum DeferQueue size                     |
-
-**Table 3-2:** Redundancy Layer configuration parameters [1].
+Different implementations may realise these interfaces differently while remaining protocol-compatible.
 
 ---
 
-## 3.8 Requirement Traceability Foundation
+## 3.7 Performance Requirements
 
-The requirements defined in this section provide the basis for the remainder of the report.
+The RaSTA specification places timing requirements on communication rather than fixed network performance requirements.
 
-```text
-Requirements
-      ↓
-Hazards
-      ↓
-Safety Functions
-      ↓
-RaSTA Mechanisms
-      ↓
-Verification
-      ↓
-Safety Case
-```
+Important configurable timing parameters include:
 
-This traceability ensures that the protocol analysis remains connected to identifiable safety, timing, diagnostic, and availability requirements.
+| Parameter  | Description                               |
+| ---------- | ----------------------------------------- |
+| **Tmax**   | Maximum acceptable message age            |
+| **Th**     | Heartbeat transmission interval           |
+| **Ti**     | Adaptive supervision timeout              |
+| **Trtd**   | Measured round-trip delay                 |
+| **Talive** | Connection supervision delay              |
+| **Tseq**   | Waiting time for out-of-sequence messages |
+
+**Table 3-3.** Principal timing parameters.
+
+Rather than assuming deterministic network delays, RaSTA continuously adapts its timeout calculations according to measured communication behaviour.
+
+---
+
+## 3.8 Configuration Requirements
+
+Several protocol parameters must be configured before communication begins.
+
+Examples include:
+
+* RaSTA Network Identifier
+* Sender Identifier
+* Receiver Identifier
+* MD4 Initial Value
+* Number of Transport Channels
+* CRC Type
+* Receive Buffer Size
+* Packetisation Factor
+
+Correct configuration is essential because several of these parameters directly influence communication safety.
+
+---
+
+## 3.9 Compliance Requirements
+
+The protocol shall comply with the following standards:
+
+| Standard           | Purpose                      |
+| ------------------ | ---------------------------- |
+| DIN VDE V 0831-200 | RaSTA Protocol Specification |
+| DIN EN 50159       | Safety-related communication |
+| DIN EN 50126       | Railway RAMS process         |
+| DIN EN 50128       | Railway software             |
+| DIN EN 50129       | Railway signalling safety    |
+| IEC 61508          | Functional safety            |
+
+Compliance with these standards ensures that RaSTA can be integrated into safety-related railway signalling systems.
+
+---
+
+## 3.10 Section Summary
+
+The requirements presented in this section define the functional and safety objectives of the RaSTA protocol.
+
+They establish the communication services, timing constraints, compatibility rules, redundancy mechanisms, and safety properties that must be satisfied by every compliant implementation.
+
+These requirements provide the foundation for the protocol architecture and operational behaviour examined in the following sections of this report.
