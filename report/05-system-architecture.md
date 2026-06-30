@@ -795,3 +795,4 @@ The Safety and Retransmission Layer ensures that only correct information reache
 Together these layers provide a modular, deterministic, and highly dependable communication architecture that satisfies the functional safety objectives required for modern railway signalling systems.
 
 The following chapter analyses the operational scenarios defined by DIN VDE V 0831-200 to demonstrate that these architectural mechanisms operate correctly during both normal and fault conditions.
+
